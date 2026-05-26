@@ -38,8 +38,7 @@ class BufferedBisimulationGames(BisimulationGames):
             for q in non_finals[1]:
                 for i in range(2):
                     for m in range(3):
-                        # TODO weg nur zum testen hier
-                        new_node = ((p, q), 'aa', i, m)
+                        new_node = ((p, q), '', i, m)
                         if check_initial(*new_node):
                             return True
 
@@ -61,7 +60,7 @@ class BufferedBisimulationGames(BisimulationGames):
         seen_nodes = attractor0
         next_attractor = set()
 
-        print()
+        # TODO hilfsfunktionen für Player 1 nodes and player 2 nodes
 
         # TODO while loop mit Abbruchbedingung
         for (state_pair, aw, i, m) in current_attractor:
@@ -75,7 +74,7 @@ class BufferedBisimulationGames(BisimulationGames):
                     w = aw[1:]
 
                     for q in self.automatons[i].get_predecessors(s=state_pair[i], a=a):
-                        new_state_pair = (q, state_pair[1]) if i == 0 else (state_pair[0], q)
+                        new_state_pair = (q, state_pair[1]) if i == 0 else (state_pair[0], q)  # TODO checken
                         new_node = (new_state_pair, w, i, MOVES[MOVE])
 
                         if new_node in seen_nodes:
@@ -84,13 +83,70 @@ class BufferedBisimulationGames(BisimulationGames):
                         if check_initial(*new_node):
                             return True
 
+                        seen_nodes.add(new_node)
                         next_attractor.add(new_node)
 
                 elif n == (self.buffer_size - 1):
                     # TODO kann von 1 oder 2 dahin gespielt worden sein
                     pass
                 elif n < (self.buffer_size - 1):
-                    # TODO kann nur von 1 dahin gespielt worden sein
+                    # kann nur von 1 dahin gespielt worden sein
+                    # TODO müsste gleich zu wenn n == self.buffer_size sein
+                    # TODO überprüfen ob n nicht mindestens 1 sein muss, bin ich mir aktuell nicht ganz sicher
                     pass
+            elif m == MOVES[FLUSH]:
+                new_node = (state_pair, aw, i, MOVES[CHOICE])
 
-        return False
+                if check_initial(*new_node):
+                    return True
+
+                seen_nodes.add(new_node)
+                next_attractor.add(new_node)
+
+            elif m == MOVES[MOVE]:
+                # Variante 1 Spieler 1 hat dorthin gespielt
+                new_node = (state_pair, aw, i, MOVES[CHOICE])
+
+                if check_initial(*new_node):
+                    return True
+
+                seen_nodes.add(new_node)
+                next_attractor.add(new_node)
+
+                # Variante 2 Spieler 2 hat den buffer geleert
+                if aw == '':
+
+                    # Alle Flush nodes bestimmen
+                    used_automaton: FiniteAutomata = self.automatons[i]
+                    pos_flash = {(state_pair[i], '')}
+
+                    predecessors = used_automaton.get_all_predecessors_with_letter(s=state_pair[i])
+                    pos_flash.update(predecessors)
+                    for _ in range(self.buffer_size - 1):
+                        new_predecessors = set()
+                        for p, v in predecessors:
+                            for q, a in used_automaton.get_all_predecessors_with_letter(s=p):
+                                new_predecessors.add((q, a + v))
+                        pos_flash.update(new_predecessors)
+                        predecessors = new_predecessors.copy()
+
+                    # TODO das in eine eigne Funktion packen
+                    # Für alle Flush nodes die möglichen nachfolger nodes bestimmen
+                    for p, v in pos_flash:
+
+                        new_state_pair = (p, state_pair[1]) if i == 0 else (state_pair[0], p)  # TODO checken
+                        new_node = (new_state_pair, v, 1 - i, MOVES[FLUSH])
+
+                        if new_node in seen_nodes:
+                            continue
+
+                        successors = used_automaton.get_successors(s=p, a=v[0]) if v else {p}
+                        for a in v[1:]:
+                            successors = {
+                                successor
+                                for s in successors
+                                for successor in used_automaton.get_successors(s=s, a=a)
+                            }
+
+                        # TODO für alle diese möglichkeiten den Buffer zu leeren überprüfen ob alle Knoten bereits in
+                        #  im Attraktor sind, wenn nicht abspeichern mit den Knoten die noch dem Attraktor hinzugefügt werden können.

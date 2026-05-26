@@ -11,5 +11,5 @@ if __name__ == '__main__':
     print(solution)
     print(submission)
 
-    buffered_bisimulation_game = BufferedBisimulationGames(automaton0=solution, automaton1=submission, buffer_size=2)
+    buffered_bisimulation_game = BufferedBisimulationGames(automaton0=solution, automaton1=submission, buffer_size=4)
     buffered_bisimulation_game.solve()
