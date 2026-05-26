@@ -11,10 +11,6 @@ MOVES = {CHOICE: 0, MOVE: 1, FLUSH: 2}
 
 class BufferedBisimulationGames(BisimulationGames):
 
-    # 0 -> choice
-    # 1 > move
-    # 2 -> flush
-
     def __init__(self, automaton0: FiniteAutomata, automaton1: FiniteAutomata, buffer_size: int):
 
         assert buffer_size >= 1, "Buffer size must be at least 1"
@@ -61,6 +57,40 @@ class BufferedBisimulationGames(BisimulationGames):
         next_attractor = set()
 
         # TODO hilfsfunktionen für Player 1 nodes and player 2 nodes
+        def new_player1_node(state_pair: tuple, w: str, i: int, m: int):
+            new_node = (state_pair, w, i, m)
+
+            if new_node in seen_nodes:
+                return False
+
+            if check_initial(*new_node):
+                return True
+
+            seen_nodes.add(new_node)
+            next_attractor.add(new_node)
+            return False
+
+        def new_player2_node(state_pair: tuple, w: str, i:int, m: int):
+            new_node = (state_pair, w, i, m)
+
+            # TODO falls bereits gesehen node
+
+            if m == MOVES[FLUSH]:
+                if new_node in seen_nodes:
+                    return False
+
+                successors = used_automaton.get_successors(s=p, a=v[0]) if v else {p}
+                for a in v[1:]:
+                    successors = {
+                        successor
+                        for s in successors
+                        for successor in used_automaton.get_successors(s=s, a=a)
+                    }
+
+                # TODO für alle diese möglichkeiten den Buffer zu leeren überprüfen ob alle Knoten bereits in
+                #  im Attraktor sind, wenn nicht abspeichern mit den Knoten die noch dem Attraktor hinzugefügt werden können.
+
+                # TODO falls in initial ist und dem attraktor hinzugefügt werden kann, dann return true
 
         # TODO while loop mit Abbruchbedingung
         for (state_pair, aw, i, m) in current_attractor:
@@ -75,16 +105,8 @@ class BufferedBisimulationGames(BisimulationGames):
 
                     for q in self.automatons[i].get_predecessors(s=state_pair[i], a=a):
                         new_state_pair = (q, state_pair[1]) if i == 0 else (state_pair[0], q)  # TODO checken
-                        new_node = (new_state_pair, w, i, MOVES[MOVE])
-
-                        if new_node in seen_nodes:
-                            continue
-
-                        if check_initial(*new_node):
+                        if new_player1_node(state_pair=new_state_pair, w=w, i=i, m=MOVES[MOVE]):
                             return True
-
-                        seen_nodes.add(new_node)
-                        next_attractor.add(new_node)
 
                 elif n == (self.buffer_size - 1):
                     # TODO kann von 1 oder 2 dahin gespielt worden sein
@@ -95,23 +117,13 @@ class BufferedBisimulationGames(BisimulationGames):
                     # TODO überprüfen ob n nicht mindestens 1 sein muss, bin ich mir aktuell nicht ganz sicher
                     pass
             elif m == MOVES[FLUSH]:
-                new_node = (state_pair, aw, i, MOVES[CHOICE])
-
-                if check_initial(*new_node):
+                if new_player1_node(state_pair=state_pair, w=aw, i=i, m=MOVES[CHOICE]):
                     return True
-
-                seen_nodes.add(new_node)
-                next_attractor.add(new_node)
 
             elif m == MOVES[MOVE]:
                 # Variante 1 Spieler 1 hat dorthin gespielt
-                new_node = (state_pair, aw, i, MOVES[CHOICE])
-
-                if check_initial(*new_node):
+                if new_player1_node(state_pair=state_pair, w=aw, i=i, m=MOVES[CHOICE]):
                     return True
-
-                seen_nodes.add(new_node)
-                next_attractor.add(new_node)
 
                 # Variante 2 Spieler 2 hat den buffer geleert
                 if aw == '':
@@ -133,20 +145,6 @@ class BufferedBisimulationGames(BisimulationGames):
                     # TODO das in eine eigne Funktion packen
                     # Für alle Flush nodes die möglichen nachfolger nodes bestimmen
                     for p, v in pos_flash:
-
                         new_state_pair = (p, state_pair[1]) if i == 0 else (state_pair[0], p)  # TODO checken
-                        new_node = (new_state_pair, v, 1 - i, MOVES[FLUSH])
-
-                        if new_node in seen_nodes:
-                            continue
-
-                        successors = used_automaton.get_successors(s=p, a=v[0]) if v else {p}
-                        for a in v[1:]:
-                            successors = {
-                                successor
-                                for s in successors
-                                for successor in used_automaton.get_successors(s=s, a=a)
-                            }
-
-                        # TODO für alle diese möglichkeiten den Buffer zu leeren überprüfen ob alle Knoten bereits in
-                        #  im Attraktor sind, wenn nicht abspeichern mit den Knoten die noch dem Attraktor hinzugefügt werden können.
+                        if new_player2_node(state_pair=new_state_pair, w=v, i=(1 - i), m=MOVES[FLUSH]):
+                            return True
