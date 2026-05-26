@@ -5,9 +5,8 @@ from wofa import FiniteAutomata
 
 class BisimulationGames(ABC):
 
-    def __init__(self, automaton1: FiniteAutomata, automaton2: FiniteAutomata):
-        self.automaton1 = automaton1
-        self.automaton2 = automaton2
+    def __init__(self, automaton0: FiniteAutomata, automaton1: FiniteAutomata):
+        self.automatons = {0: automaton0, 1: automaton1}
 
     @abstractmethod
     def solve(self):

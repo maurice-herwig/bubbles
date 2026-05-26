@@ -8,5 +8,8 @@ if __name__ == '__main__':
     FiniteAutomata.set_alphabet(solution.calc_and_get_alphabet())
     submission.remove_non_alphabet_transitions()
 
-    buffered_bisimulation_game = BufferedBisimulationGames(automaton1=solution, automaton2=submission, buffer_size=2)
+    print(solution)
+    print(submission)
 
+    buffered_bisimulation_game = BufferedBisimulationGames(automaton0=solution, automaton1=submission, buffer_size=2)
+    buffered_bisimulation_game.solve()
