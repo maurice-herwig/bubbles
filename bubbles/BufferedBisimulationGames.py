@@ -3,7 +3,10 @@ from .BisimulationGames import BisimulationGames
 
 import pprint
 
-MOVES = {0: "choice", 1: "move", 2: "flush", 3: "step"}
+CHOICE = "CHOICE"
+MOVE = "MOVE"
+FLUSH = "FLUSH"
+MOVES = {CHOICE: 0, MOVE: 1, FLUSH: 2}
 
 
 class BufferedBisimulationGames(BisimulationGames):
@@ -11,7 +14,6 @@ class BufferedBisimulationGames(BisimulationGames):
     # 0 -> choice
     # 1 > move
     # 2 -> flush
-    # 3 -> step TODO: step wird nicht gebraucht...
 
     def __init__(self, automaton0: FiniteAutomata, automaton1: FiniteAutomata, buffer_size: int):
 
@@ -35,22 +37,23 @@ class BufferedBisimulationGames(BisimulationGames):
         for p in finals[0]:
             for q in non_finals[1]:
                 for i in range(2):
-                    for m in range(4):
-                        node = ((p, q), '', i, m)
-                        if check_initial(*node):
+                    for m in range(3):
+                        # TODO weg nur zum testen hier
+                        new_node = ((p, q), 'aa', i, m)
+                        if check_initial(*new_node):
                             return True
 
-                        attractor0.add(node)
+                        attractor0.add(new_node)
 
         for p in non_finals[0]:
             for q in finals[1]:
                 for i in range(2):
                     for m in range(4):
-                        node = ((p, q), '', i, m)
-                        if check_initial(*node):
+                        new_node = ((p, q), '', i, m)
+                        if check_initial(*new_node):
                             return True
 
-                        attractor0.add(node)
+                        attractor0.add(new_node)
 
         # TODO ab hier aufräumen, da die Datenstruktur nicht optimal ist
         pprint.pprint(attractor0)
@@ -58,17 +61,31 @@ class BufferedBisimulationGames(BisimulationGames):
         seen_nodes = attractor0
         next_attractor = set()
 
+        print()
+
         # TODO while loop mit Abbruchbedingung
-        for ([p, q], w, i, m) in current_attractor:
+        for (state_pair, aw, i, m) in current_attractor:
 
             # choice
-            if m == 0:
-                n = len(w)
+            if m == MOVES[CHOICE]:
+                n = len(aw)
                 if n == self.buffer_size:
                     # kann nur von Spieler 1 darhin gespiellt worden sein
-                    a = w[0]
-                    v = w[1:]
-                    pass
+                    a = aw[0]
+                    w = aw[1:]
+
+                    for q in self.automatons[i].get_predecessors(s=state_pair[i], a=a):
+                        new_state_pair = (q, state_pair[1]) if i == 0 else (state_pair[0], q)
+                        new_node = (new_state_pair, w, i, MOVES[MOVE])
+
+                        if new_node in seen_nodes:
+                            continue
+
+                        if check_initial(*new_node):
+                            return True
+
+                        next_attractor.add(new_node)
+
                 elif n == (self.buffer_size - 1):
                     # TODO kann von 1 oder 2 dahin gespielt worden sein
                     pass
