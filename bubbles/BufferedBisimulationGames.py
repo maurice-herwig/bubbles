@@ -26,8 +26,9 @@ class BufferedBisimulationGames(BisimulationGames):
                       for i in range(2)}
         initials = {i: self.automatons[i].get_initials() for i in range(2)}
 
-        def check_initial(p, w, q, i, m):
-            return p in initials[0] and q in initials[1] and w == '' and i == 0 and m == 0
+        def check_initial(state_pair: tuple, w: str, i: int, m: int):
+            # TODO aufschrieb aktuell nur für ein startzustand
+            return state_pair[0] in initials[0] and state_pair[1] in initials[1] and w == '' and i == 0 and m == 0
 
         # TODO Datenstruktur für besseren zugriff optimieren
         attractor0 = set()
@@ -35,19 +36,21 @@ class BufferedBisimulationGames(BisimulationGames):
             for q in non_finals[1]:
                 for i in range(2):
                     for m in range(4):
-                        if check_initial(p, '', q, i, m):
+                        node = ((p, q), '', i, m)
+                        if check_initial(*node):
                             return True
 
-                        attractor0.add((p, '', q, i, m))
+                        attractor0.add(node)
 
         for p in non_finals[0]:
             for q in finals[1]:
                 for i in range(2):
                     for m in range(4):
-                        if check_initial(p, '', q, i, m):
+                        node = ((p, q), '', i, m)
+                        if check_initial(*node):
                             return True
 
-                        attractor0.add((p, '', q, i, m))
+                        attractor0.add(node)
 
         # TODO ab hier aufräumen, da die Datenstruktur nicht optimal ist
         pprint.pprint(attractor0)
@@ -56,7 +59,7 @@ class BufferedBisimulationGames(BisimulationGames):
         next_attractor = set()
 
         # TODO while loop mit Abbruchbedingung
-        for (p, w, q, i, m) in current_attractor:
+        for ([p, q], w, i, m) in current_attractor:
 
             # choice
             if m == 0:
