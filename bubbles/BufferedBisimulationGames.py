@@ -52,48 +52,75 @@ class BufferedBisimulationGames(BisimulationGames):
 
         # TODO ab hier aufräumen, da die Datenstruktur nicht optimal ist
         pprint.pprint(attractor0)
-        current_attractor = attractor0
-        seen_nodes = attractor0
-        next_attractor = set()
+        last__added_attractor_nodes = attractor0
+        all_attractor_nodes = attractor0
+        new_attractor_nodes = set()
 
-        # TODO hilfsfunktionen für Player 1 nodes and player 2 nodes
         def new_player1_node(state_pair: tuple, w: str, i: int, m: int):
             new_node = (state_pair, w, i, m)
 
-            if new_node in seen_nodes:
+            if new_node in all_attractor_nodes:
                 return False
+
+            # TODO überpüfen ob er aus der liste einer von player 2 nodes genommen werden kann die noch nicht im Attraktor sind.
 
             if check_initial(*new_node):
                 return True
 
-            seen_nodes.add(new_node)
-            next_attractor.add(new_node)
+            all_attractor_nodes.add(new_node)
+            new_attractor_nodes.add(new_node)
             return False
 
-        def new_player2_node(state_pair: tuple, w: str, i:int, m: int):
+        def new_player2_node(state_pair: tuple, w: str, i: int, m: int):
             new_node = (state_pair, w, i, m)
 
-            # TODO falls bereits gesehen node
+            if new_node in all_attractor_nodes:
+                return False
+
+            # TODO Liste mit allen bereits gesehenen player 2 nodes, die nicht im attraktor sind.
 
             if m == MOVES[FLUSH]:
-                if new_node in seen_nodes:
+                if new_node in all_attractor_nodes:
                     return False
 
+                # Compute all states that can be reached by flushing the buffer
                 successors = used_automaton.get_successors(s=p, a=v[0]) if v else {p}
-                for a in v[1:]:
+                for letter in v[1:]:
                     successors = {
                         successor
                         for s in successors
-                        for successor in used_automaton.get_successors(s=s, a=a)
+                        for successor in used_automaton.get_successors(s=s, a=letter)
                     }
 
-                # TODO für alle diese möglichkeiten den Buffer zu leeren überprüfen ob alle Knoten bereits in
-                #  im Attraktor sind, wenn nicht abspeichern mit den Knoten die noch dem Attraktor hinzugefügt werden können.
+                # Compute all nodes that can be reached by flushing the buffer
+                successors_not_in_attractor = set()
+                for successor in successors:
+                    successor_state_pair = (state_pair[0], successor) if i == 0 else (successor, state_pair[1])
+                    successor_node = (successor_state_pair, '', 1 - i, MOVES[MOVE])
 
-                # TODO falls in initial ist und dem attraktor hinzugefügt werden kann, dann return true
+                    if successor_node not in all_attractor_nodes:
+                        successors_not_in_attractor.add(successor_node)
+
+                # Check if all successors nodes are in the attractor, then player 2 have no choice to don't play into the attractor.
+                if not successors_not_in_attractor:
+
+                    if check_initial(*new_node):
+                        return True
+
+                    all_attractor_nodes.add(new_node)
+                    new_attractor_nodes.add(new_node)
+                else:
+                    # TODO abspeichern in liste der bereits gesehen spieler 2 Knoten aber noch nicht im attraktor knoten.
+                    pass
+            elif m == MOVES[MOVE]:
+                # TODO
+                pass
+
+            return False
+
 
         # TODO while loop mit Abbruchbedingung
-        for (state_pair, aw, i, m) in current_attractor:
+        for (state_pair, aw, i, m) in last__added_attractor_nodes:
 
             # choice
             if m == MOVES[CHOICE]:
@@ -104,7 +131,7 @@ class BufferedBisimulationGames(BisimulationGames):
                     w = aw[1:]
 
                     for q in self.automatons[i].get_predecessors(s=state_pair[i], a=a):
-                        new_state_pair = (q, state_pair[1]) if i == 0 else (state_pair[0], q)  # TODO checken
+                        new_state_pair = (q, state_pair[1]) if i == 0 else (state_pair[0], q)
                         if new_player1_node(state_pair=new_state_pair, w=w, i=i, m=MOVES[MOVE]):
                             return True
 
@@ -142,9 +169,11 @@ class BufferedBisimulationGames(BisimulationGames):
                         pos_flash.update(new_predecessors)
                         predecessors = new_predecessors.copy()
 
-                    # TODO das in eine eigne Funktion packen
                     # Für alle Flush nodes die möglichen nachfolger nodes bestimmen
                     for p, v in pos_flash:
-                        new_state_pair = (p, state_pair[1]) if i == 0 else (state_pair[0], p)  # TODO checken
+                        new_state_pair = (state_pair[0], p) if i == 0 else (p, state_pair[1])
                         if new_player2_node(state_pair=new_state_pair, w=v, i=(1 - i), m=MOVES[FLUSH]):
                             return True
+
+        #  Player 2 wins the game
+        return False
