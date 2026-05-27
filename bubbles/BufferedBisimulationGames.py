@@ -19,37 +19,17 @@ class BufferedBisimulationGames(BisimulationGames):
 
     def solve(self):
 
-        finals = {i: self.automatons[i].get_finals() for i in range(2)}
-        non_finals = {i: {s for s in range(self.automatons[i].get_number_of_states()) if s not in finals[i]}
-                      for i in range(2)}
-        initials = {i: self.automatons[i].get_initials() for i in range(2)}
-
+        # =====================
+        # auxiliary functions
+        # =====================
         def check_initial(state_pair: tuple, w: str, i: int, m: int):
             # TODO aufschrieb aktuell nur für ein startzustand
             return state_pair[0] in initials[0] and state_pair[1] in initials[1] and w == '' and i == 0 and m == 0
 
-        # TODO Datenstruktur für besseren zugriff optimieren
-        all_attractor_nodes = set()
-
-        for p in finals[0]:
-            for q in non_finals[1]:
-                for i in range(2):
-                    for m in range(3):
-                        new_node = ((p, q), '', i, m)
-                        if check_initial(*new_node):
-                            return False, f'The automatas are not {self.buffer_size}-buffer equivalent'
-
-                        all_attractor_nodes.add(new_node)
-
-        for p in non_finals[0]:
-            for q in finals[1]:
-                for i in range(2):
-                    for m in range(4):
-                        new_node = ((p, q), '', i, m)
-                        if check_initial(*new_node):
-                            return False, f'The automatas are not {self.buffer_size}-buffer equivalent'
-
-                        all_attractor_nodes.add(new_node)
+        finals = {i: self.automatons[i].get_finals() for i in range(2)}
+        non_finals = {i: {s for s in range(self.automatons[i].get_number_of_states()) if s not in finals[i]}
+                      for i in range(2)}
+        initials = {i: self.automatons[i].get_initials() for i in range(2)}
 
         def new_player1_node(state_pair: tuple, w: str, i: int, m: int):
             new_node = (state_pair, w, i, m)
@@ -113,6 +93,44 @@ class BufferedBisimulationGames(BisimulationGames):
 
             return False
 
+        def add_moves_to_player1_node_for_choice_nodes(state_pair: tuple, aw: str, i: int):
+            a = aw[0]
+            w = aw[1:]
+
+            for q in self.automatons[i].get_predecessors(s=state_pair[i], a=a):
+                new_state_pair = (q, state_pair[1]) if i == 0 else (state_pair[0], q)
+                if new_player1_node(state_pair=new_state_pair, w=w, i=i, m=MOVES[MOVE]):
+                    return True
+
+            return False
+
+        # =====================
+        # End of the auxiliary functions
+        # =====================
+
+        # TODO Datenstruktur für besseren zugriff optimieren
+        all_attractor_nodes = set()
+
+        for p in finals[0]:
+            for q in non_finals[1]:
+                for i in range(2):
+                    for m in range(3):
+                        new_node = ((p, q), '', i, m)
+                        if check_initial(*new_node):
+                            return False, f'The automatas are not {self.buffer_size}-buffer equivalent'
+
+                        all_attractor_nodes.add(new_node)
+
+        for p in non_finals[0]:
+            for q in finals[1]:
+                for i in range(2):
+                    for m in range(4):
+                        new_node = ((p, q), '', i, m)
+                        if check_initial(*new_node):
+                            return False, f'The automatas are not {self.buffer_size}-buffer equivalent'
+
+                        all_attractor_nodes.add(new_node)
+
         last_added_attractor_nodes = all_attractor_nodes.copy()
         new_attractor_nodes = set()
 
@@ -125,22 +143,23 @@ class BufferedBisimulationGames(BisimulationGames):
                     n = len(aw)
                     if n == self.buffer_size:
                         # kann nur von Spieler 1 darhin gespiellt worden sein
-                        a = aw[0]
-                        w = aw[1:]
-
-                        for q in self.automatons[i].get_predecessors(s=state_pair[i], a=a):
-                            new_state_pair = (q, state_pair[1]) if i == 0 else (state_pair[0], q)
-                            if new_player1_node(state_pair=new_state_pair, w=w, i=i, m=MOVES[MOVE]):
-                                return False, f'The automatas are not {self.buffer_size}-buffer equivalent'
+                        if add_moves_to_player1_node_for_choice_nodes(state_pair=state_pair, aw=aw, i=i):
+                            return False, f'The automatas are not {self.buffer_size}-buffer equivalent'
 
                     elif n == (self.buffer_size - 1):
-                        # TODO kann von 1 oder 2 dahin gespielt worden sein
-                        pass
-                    elif n < (self.buffer_size - 1):
+                        # kann von 1 oder 2 dahin gespielt worden sein
+                        # case player 1
+                        if add_moves_to_player1_node_for_choice_nodes(state_pair=state_pair, aw=aw, i=i):
+                            return False, f'The automatas are not {self.buffer_size}-buffer equivalent'
+
+                        # case plyer 2
+                        # TODO
+
+                    elif (self.buffer_size - 1) > n > 0:
                         # kann nur von 1 dahin gespielt worden sein
-                        # TODO müsste gleich zu wenn n == self.buffer_size sein
-                        # TODO überprüfen ob n nicht mindestens 1 sein muss, bin ich mir aktuell nicht ganz sicher
-                        pass
+                        if add_moves_to_player1_node_for_choice_nodes(state_pair=state_pair, aw=aw, i=i):
+                            return False, f'The automatas are not {self.buffer_size}-buffer equivalent'
+
                 elif m == MOVES[FLUSH]:
                     if new_player1_node(state_pair=state_pair, w=aw, i=i, m=MOVES[CHOICE]):
                         return False, f'The automatas are not {self.buffer_size}-buffer equivalent'
