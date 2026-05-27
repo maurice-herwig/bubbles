@@ -29,16 +29,17 @@ class BufferedBisimulationGames(BisimulationGames):
             return state_pair[0] in initials[0] and state_pair[1] in initials[1] and w == '' and i == 0 and m == 0
 
         # TODO Datenstruktur für besseren zugriff optimieren
-        attractor0 = set()
+        all_attractor_nodes = set()
+
         for p in finals[0]:
             for q in non_finals[1]:
                 for i in range(2):
                     for m in range(3):
                         new_node = ((p, q), '', i, m)
                         if check_initial(*new_node):
-                            return True
+                            return False, f'The automatas are not {self.buffer_size}-buffer equivalent'
 
-                        attractor0.add(new_node)
+                        all_attractor_nodes.add(new_node)
 
         for p in non_finals[0]:
             for q in finals[1]:
@@ -46,15 +47,9 @@ class BufferedBisimulationGames(BisimulationGames):
                     for m in range(4):
                         new_node = ((p, q), '', i, m)
                         if check_initial(*new_node):
-                            return True
+                            return False, f'The automatas are not {self.buffer_size}-buffer equivalent'
 
-                        attractor0.add(new_node)
-
-        # TODO ab hier aufräumen, da die Datenstruktur nicht optimal ist
-        pprint.pprint(attractor0)
-        last__added_attractor_nodes = attractor0
-        all_attractor_nodes = attractor0
-        new_attractor_nodes = set()
+                        all_attractor_nodes.add(new_node)
 
         def new_player1_node(state_pair: tuple, w: str, i: int, m: int):
             new_node = (state_pair, w, i, m)
@@ -118,62 +113,69 @@ class BufferedBisimulationGames(BisimulationGames):
 
             return False
 
+        last_added_attractor_nodes = all_attractor_nodes.copy()
+        new_attractor_nodes = set()
 
-        # TODO while loop mit Abbruchbedingung
-        for (state_pair, aw, i, m) in last__added_attractor_nodes:
+        # main loop
+        while last_added_attractor_nodes:
+            for (state_pair, aw, i, m) in last_added_attractor_nodes:
 
-            # choice
-            if m == MOVES[CHOICE]:
-                n = len(aw)
-                if n == self.buffer_size:
-                    # kann nur von Spieler 1 darhin gespiellt worden sein
-                    a = aw[0]
-                    w = aw[1:]
+                # choice
+                if m == MOVES[CHOICE]:
+                    n = len(aw)
+                    if n == self.buffer_size:
+                        # kann nur von Spieler 1 darhin gespiellt worden sein
+                        a = aw[0]
+                        w = aw[1:]
 
-                    for q in self.automatons[i].get_predecessors(s=state_pair[i], a=a):
-                        new_state_pair = (q, state_pair[1]) if i == 0 else (state_pair[0], q)
-                        if new_player1_node(state_pair=new_state_pair, w=w, i=i, m=MOVES[MOVE]):
-                            return True
+                        for q in self.automatons[i].get_predecessors(s=state_pair[i], a=a):
+                            new_state_pair = (q, state_pair[1]) if i == 0 else (state_pair[0], q)
+                            if new_player1_node(state_pair=new_state_pair, w=w, i=i, m=MOVES[MOVE]):
+                                return False, f'The automatas are not {self.buffer_size}-buffer equivalent'
 
-                elif n == (self.buffer_size - 1):
-                    # TODO kann von 1 oder 2 dahin gespielt worden sein
-                    pass
-                elif n < (self.buffer_size - 1):
-                    # kann nur von 1 dahin gespielt worden sein
-                    # TODO müsste gleich zu wenn n == self.buffer_size sein
-                    # TODO überprüfen ob n nicht mindestens 1 sein muss, bin ich mir aktuell nicht ganz sicher
-                    pass
-            elif m == MOVES[FLUSH]:
-                if new_player1_node(state_pair=state_pair, w=aw, i=i, m=MOVES[CHOICE]):
-                    return True
+                    elif n == (self.buffer_size - 1):
+                        # TODO kann von 1 oder 2 dahin gespielt worden sein
+                        pass
+                    elif n < (self.buffer_size - 1):
+                        # kann nur von 1 dahin gespielt worden sein
+                        # TODO müsste gleich zu wenn n == self.buffer_size sein
+                        # TODO überprüfen ob n nicht mindestens 1 sein muss, bin ich mir aktuell nicht ganz sicher
+                        pass
+                elif m == MOVES[FLUSH]:
+                    if new_player1_node(state_pair=state_pair, w=aw, i=i, m=MOVES[CHOICE]):
+                        return False, f'The automatas are not {self.buffer_size}-buffer equivalent'
 
-            elif m == MOVES[MOVE]:
-                # Variante 1 Spieler 1 hat dorthin gespielt
-                if new_player1_node(state_pair=state_pair, w=aw, i=i, m=MOVES[CHOICE]):
-                    return True
+                elif m == MOVES[MOVE]:
+                    # Variante 1 Spieler 1 hat dorthin gespielt
+                    if new_player1_node(state_pair=state_pair, w=aw, i=i, m=MOVES[CHOICE]):
+                        return False, f'The automatas are not {self.buffer_size}-buffer equivalent'
 
-                # Variante 2 Spieler 2 hat den buffer geleert
-                if aw == '':
+                    # Variante 2 Spieler 2 hat den buffer geleert
+                    if aw == '':
 
-                    # Alle Flush nodes bestimmen
-                    used_automaton: FiniteAutomata = self.automatons[i]
-                    pos_flash = {(state_pair[i], '')}
+                        # Alle Flush nodes bestimmen
+                        used_automaton: FiniteAutomata = self.automatons[i]
+                        pos_flash = {(state_pair[i], '')}
 
-                    predecessors = used_automaton.get_all_predecessors_with_letter(s=state_pair[i])
-                    pos_flash.update(predecessors)
-                    for _ in range(self.buffer_size - 1):
-                        new_predecessors = set()
-                        for p, v in predecessors:
-                            for q, a in used_automaton.get_all_predecessors_with_letter(s=p):
-                                new_predecessors.add((q, a + v))
-                        pos_flash.update(new_predecessors)
-                        predecessors = new_predecessors.copy()
+                        predecessors = used_automaton.get_all_predecessors_with_letter(s=state_pair[i])
+                        pos_flash.update(predecessors)
+                        for _ in range(self.buffer_size - 1):
+                            new_predecessors = set()
+                            for p, v in predecessors:
+                                for q, a in used_automaton.get_all_predecessors_with_letter(s=p):
+                                    new_predecessors.add((q, a + v))
+                            pos_flash.update(new_predecessors)
+                            predecessors = new_predecessors.copy()
 
-                    # Für alle Flush nodes die möglichen nachfolger nodes bestimmen
-                    for p, v in pos_flash:
-                        new_state_pair = (state_pair[0], p) if i == 0 else (p, state_pair[1])
-                        if new_player2_node(state_pair=new_state_pair, w=v, i=(1 - i), m=MOVES[FLUSH]):
-                            return True
+                        # Für alle Flush nodes die möglichen nachfolger nodes bestimmen
+                        for p, v in pos_flash:
+                            new_state_pair = (state_pair[0], p) if i == 0 else (p, state_pair[1])
+                            if new_player2_node(state_pair=new_state_pair, w=v, i=(1 - i), m=MOVES[FLUSH]):
+                                return False, f'The automatas are not {self.buffer_size}-buffer equivalent'
+
+            # Update for next iteration
+            last_added_attractor_nodes = new_attractor_nodes.copy()
+            new_attractor_nodes = set()
 
         #  Player 2 wins the game
-        return False
+        return True, f'The automatas are {self.buffer_size}-buffer equivalent'
