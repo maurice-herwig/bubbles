@@ -1,5 +1,6 @@
 from wofa import FiniteAutomata
 from .BisimulationGames import BisimulationGames
+from .TwoWaySetMap import TwoWaySetMap
 
 CHOICE = "CHOICE"
 MOVE = "MOVE"
@@ -84,10 +85,12 @@ class BufferedBisimulationGames(BisimulationGames):
                     all_attractor_nodes.add(new_node)
                     new_attractor_nodes.add(new_node)
                 else:
-                    # TODO abspeichern in liste der bereits gesehen spieler 2 Knoten aber noch nicht im attraktor knoten.
-                    pass
+                    # Add all not in attractor successor nodes to the list of seen player 2 nodes that are
+                    # not in the attractor, so we can check later if we possible add some of them to the attractor,
+                    # if we have also add the new node to the attractor.
+                    seen_player2_nodes_not_in_attractor.add_many(new_node, successors_not_in_attractor)
             elif m == MOVES[MOVE]:
-                # TODO
+                # TODO alle nochfolger bestimmen
                 pass
 
             return False
@@ -130,6 +133,7 @@ class BufferedBisimulationGames(BisimulationGames):
 
                         all_attractor_nodes.add(new_node)
 
+        seen_player2_nodes_not_in_attractor = TwoWaySetMap()
         last_added_attractor_nodes = all_attractor_nodes.copy()
         new_attractor_nodes = set()
 
