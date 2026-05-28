@@ -1,8 +1,6 @@
 from wofa import FiniteAutomata
 from .BisimulationGames import BisimulationGames
 
-import pprint
-
 CHOICE = "CHOICE"
 MOVE = "MOVE"
 FLUSH = "FLUSH"
@@ -76,7 +74,8 @@ class BufferedBisimulationGames(BisimulationGames):
                     if successor_node not in all_attractor_nodes:
                         successors_not_in_attractor.add(successor_node)
 
-                # Check if all successors nodes are in the attractor, then player 2 have no choice to don't play into the attractor.
+                # Check if all successors nodes are in the attractor, then player 2 have no choice to don't play into
+                # the attractor.
                 if not successors_not_in_attractor:
 
                     if check_initial(*new_node):
@@ -136,41 +135,43 @@ class BufferedBisimulationGames(BisimulationGames):
 
         # main loop
         while last_added_attractor_nodes:
-            for (state_pair, aw, i, m) in last_added_attractor_nodes:
+            for (state_pair, buffer_word, i, m) in last_added_attractor_nodes:
 
                 # choice
                 if m == MOVES[CHOICE]:
-                    n = len(aw)
+                    n = len(buffer_word)
                     if n == self.buffer_size:
                         # kann nur von Spieler 1 darhin gespiellt worden sein
-                        if add_moves_to_player1_node_for_choice_nodes(state_pair=state_pair, aw=aw, i=i):
+                        if add_moves_to_player1_node_for_choice_nodes(state_pair=state_pair, aw=buffer_word, i=i):
                             return False, f'The automatas are not {self.buffer_size}-buffer equivalent'
 
                     elif n == (self.buffer_size - 1):
                         # kann von 1 oder 2 dahin gespielt worden sein
                         # case player 1
-                        if add_moves_to_player1_node_for_choice_nodes(state_pair=state_pair, aw=aw, i=i):
+                        if add_moves_to_player1_node_for_choice_nodes(state_pair=state_pair, aw=buffer_word, i=i):
                             return False, f'The automatas are not {self.buffer_size}-buffer equivalent'
 
                         # case plyer 2
-                        # TODO
+                        for q, a in self.automatons[1 - i].get_all_predecessors_with_letter(s=state_pair[1 - 1]):
+                            new_state_pair = (state_pair[0], q) if i == 0 else (q, state_pair[1])
+                            new_player2_node(state_pair=new_state_pair, w=buffer_word + a, i=i, m=MOVES[MOVE])
 
                     elif (self.buffer_size - 1) > n > 0:
                         # kann nur von 1 dahin gespielt worden sein
-                        if add_moves_to_player1_node_for_choice_nodes(state_pair=state_pair, aw=aw, i=i):
+                        if add_moves_to_player1_node_for_choice_nodes(state_pair=state_pair, aw=buffer_word, i=i):
                             return False, f'The automatas are not {self.buffer_size}-buffer equivalent'
 
                 elif m == MOVES[FLUSH]:
-                    if new_player1_node(state_pair=state_pair, w=aw, i=i, m=MOVES[CHOICE]):
+                    if new_player1_node(state_pair=state_pair, w=buffer_word, i=i, m=MOVES[CHOICE]):
                         return False, f'The automatas are not {self.buffer_size}-buffer equivalent'
 
                 elif m == MOVES[MOVE]:
                     # Variante 1 Spieler 1 hat dorthin gespielt
-                    if new_player1_node(state_pair=state_pair, w=aw, i=i, m=MOVES[CHOICE]):
+                    if new_player1_node(state_pair=state_pair, w=buffer_word, i=i, m=MOVES[CHOICE]):
                         return False, f'The automatas are not {self.buffer_size}-buffer equivalent'
 
                     # Variante 2 Spieler 2 hat den buffer geleert
-                    if aw == '':
+                    if buffer_word == '':
 
                         # Alle Flush nodes bestimmen
                         used_automaton: FiniteAutomata = self.automatons[i]
