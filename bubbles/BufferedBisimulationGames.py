@@ -86,9 +86,11 @@ class BufferedBisimulationGames(BisimulationGames):
                     new_attractor_nodes.add(new_node)
                 else:
                     # Add all not in attractor successor nodes to the list of seen player 2 nodes that are
-                    # not in the attractor, so we can check later if we possible add some of them to the attractor,
+                    # not in the attractor, so we can check later if we possibly add some of them to the attractor,
                     # if we have also add the new node to the attractor.
                     seen_player2_nodes_not_in_attractor.add_many(new_node, successors_not_in_attractor)
+
+                    print(seen_player2_nodes_not_in_attractor)
             elif m == MOVES[MOVE]:
                 # TODO alle nochfolger bestimmen
                 pass

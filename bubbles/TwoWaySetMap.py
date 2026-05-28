@@ -97,3 +97,7 @@ class TwoWaySetMap:
     def items(self) -> dict[tuple, set[tuple]]:
         """Return a copy of the full forward map."""
         return {key: set(values) for key, values in self._forward.items()}
+
+    def __str__(self):
+        """Print the full forward map in a readable form."""
+        return str(self.items())
