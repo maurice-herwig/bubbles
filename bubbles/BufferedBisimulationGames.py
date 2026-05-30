@@ -111,6 +111,9 @@ class BufferedBisimulationGames(BisimulationGames):
             return False
 
         def add_moves_to_player1_node_for_choice_nodes(state_pair: tuple, aw: str, i: int):
+            if not aw:
+                return False
+
             a = aw[0]
             w = aw[1:]
 
