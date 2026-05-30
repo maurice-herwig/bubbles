@@ -60,37 +60,37 @@ class BufferedBisimulationGames(BisimulationGames):
 
         def new_player1_node(
                 node_state_pair: tuple, buffer_word: str, automaton_index: int, move_type: int):
-            new_node = (node_state_pair, buffer_word, automaton_index, move_type)
+            new_node_player1 = (node_state_pair, buffer_word, automaton_index, move_type)
 
-            if new_node in all_attractor_nodes:
+            if new_node_player1 in all_attractor_nodes:
                 return False
 
-            if check_initial(*new_node):
+            if check_initial(*new_node_player1):
                 return True
 
-            all_attractor_nodes.add(new_node)
-            new_attractor_nodes.add(new_node)
-            return propagate_new_attractor_nodes([new_node])
+            all_attractor_nodes.add(new_node_player1)
+            new_attractor_nodes.add(new_node_player1)
+            return propagate_new_attractor_nodes([new_node_player1])
 
         def new_player2_node(
                 node_state_pair: tuple, buffer_word: str, automaton_index: int, move_type: int):
-            new_node = (node_state_pair, buffer_word, automaton_index, move_type)
+            new_node_player2 = (node_state_pair, buffer_word, automaton_index, move_type)
 
-            if new_node in all_attractor_nodes:
+            if new_node_player2 in all_attractor_nodes:
                 return False
 
-            if seen_player2_nodes_not_in_attractor.has_key(new_node):
+            if seen_player2_nodes_not_in_attractor.has_key(new_node_player2):
                 return False
 
             successors_not_in_attractor = set()
 
             if move_type == MOVES[FLUSH]:
-                used_automaton: FiniteAutomata = self.automatons[1 - automaton_index]
+                current_used_automaton: FiniteAutomata = self.automatons[1 - automaton_index]
                 current_state = node_state_pair[1 - automaton_index]
 
                 # Compute all states that can be reached by flushing the buffer
                 successors = (
-                    used_automaton.get_successors(s=current_state, a=buffer_word[0])
+                    current_used_automaton.get_successors(s=current_state, a=buffer_word[0])
                     if buffer_word
                     else {current_state}
                 )
@@ -98,7 +98,7 @@ class BufferedBisimulationGames(BisimulationGames):
                     successors = {
                         successor
                         for successor_state in successors
-                        for successor in used_automaton.get_successors(s=successor_state, a=letter)
+                        for successor in current_used_automaton.get_successors(s=successor_state, a=letter)
                     }
 
                 # Compute all nodes that can be reached by flushing the buffer
@@ -134,18 +134,18 @@ class BufferedBisimulationGames(BisimulationGames):
             # the attractor.
             if not successors_not_in_attractor:
 
-                if check_initial(*new_node):
+                if check_initial(*new_node_player2):
                     return True
 
-                all_attractor_nodes.add(new_node)
-                new_attractor_nodes.add(new_node)
-                if propagate_new_attractor_nodes([new_node]):
+                all_attractor_nodes.add(new_node_player2)
+                new_attractor_nodes.add(new_node_player2)
+                if propagate_new_attractor_nodes([new_node_player2]):
                     return True
             else:
                 # Add all not in attractor successor nodes to the list of seen player 2 nodes that are
                 # not in the attractor, so we can check later if we possibly add some of them to the attractor,
                 # if we have also add the new node to the attractor.
-                seen_player2_nodes_not_in_attractor.add_many(new_node, successors_not_in_attractor)
+                seen_player2_nodes_not_in_attractor.add_many(new_node_player2, successors_not_in_attractor)
 
             return False
 
