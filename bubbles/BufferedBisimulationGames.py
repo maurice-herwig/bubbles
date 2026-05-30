@@ -233,12 +233,23 @@ class BufferedBisimulationGames(BisimulationGames):
                 #
                 # We therefore enumerate all states reachable by reading the
                 # whole word w in automaton A_(1-i).
+                # The buffer stores words in the same orientation as the
+                # player-I move rule appends them:
+                #
+                #   w -> aw
+                #
+                # Hence the oldest symbol is stored at the right end of the
+                # buffer word. A flush must therefore read the buffered word
+                # from right to left, i.e. in reversed(buffer_word), to stay
+                # consistent with the full-buffer MOVE rule that consumes
+                # buffer_word[-1].
+                flush_word = list(reversed(buffer_word))
                 reachable_states = (
-                    used_automaton.get_successors(s=current_state, a=buffer_word[0])
-                    if buffer_word
+                    used_automaton.get_successors(s=current_state, a=flush_word[0])
+                    if flush_word
                     else {current_state}
                 )
-                for letter in buffer_word[1:]:
+                for letter in flush_word[1:]:
                     reachable_states = {
                         successor_state
                         for intermediate_state in reachable_states
@@ -530,7 +541,7 @@ class BufferedBisimulationGames(BisimulationGames):
                             for predecessor_state, predecessor_word in predecessor_pairs:
                                 for new_state, new_letter in used_automaton.get_all_predecessors_with_letter(
                                         s=predecessor_state):
-                                    new_predecessor_pairs.add((new_state, new_letter + predecessor_word))
+                                    new_predecessor_pairs.add((new_state, predecessor_word + new_letter))
                             possible_flush_predecessors.update(new_predecessor_pairs)
                             predecessor_pairs = new_predecessor_pairs.copy()
 
@@ -554,3 +565,4 @@ class BufferedBisimulationGames(BisimulationGames):
         # If the initial node never entered the player-I attractor, then player
         # II can avoid F forever and therefore has a winning strategy.
         return True, f'The automatas are {self.buffer_size}-buffer equivalent'
+
