@@ -13,6 +13,6 @@ if __name__ == '__main__':
 
     print(f'Is the solution and the submission equivalent? {solution.equivalence_test(other=submission)}')
 
-    buffered_bisimulation_game = BufferedBisimulationGames(automaton0=solution, automaton1=submission, buffer_size=3)
+    buffered_bisimulation_game = BufferedBisimulationGames(automaton0=solution, automaton1=submission, buffer_size=1)
     res = buffered_bisimulation_game.solve()
     print(res)

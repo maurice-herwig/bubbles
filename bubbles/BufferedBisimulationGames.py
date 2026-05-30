@@ -62,13 +62,12 @@ class BufferedBisimulationGames(BisimulationGames):
             if seen_player2_nodes_not_in_attractor.has_value(new_node):
                 return False
 
-            if m == MOVES[FLUSH]:
-                if new_node in all_attractor_nodes:
-                    return False
+            successors_not_in_attractor = set()
 
+            if m == MOVES[FLUSH]:
                 # Compute all states that can be reached by flushing the buffer
-                successors = used_automaton.get_successors(s=p, a=v[0]) if v else {p}
-                for letter in v[1:]:
+                successors = used_automaton.get_successors(s=p, a=w[0]) if w else {p}
+                for letter in w[1:]:
                     successors = {
                         successor
                         for s in successors
@@ -76,7 +75,6 @@ class BufferedBisimulationGames(BisimulationGames):
                     }
 
                 # Compute all nodes that can be reached by flushing the buffer
-                successors_not_in_attractor = set()
                 for successor in successors:
                     successor_state_pair = (state_pair[0], successor) if i == 0 else (successor, state_pair[1])
                     successor_node = (successor_state_pair, '', 1 - i, MOVES[MOVE])
@@ -84,24 +82,31 @@ class BufferedBisimulationGames(BisimulationGames):
                     if successor_node not in all_attractor_nodes:
                         successors_not_in_attractor.add(successor_node)
 
-                # Check if all successors nodes are in the attractor, then player 2 have no choice to don't play into
-                # the attractor.
-                if not successors_not_in_attractor:
-
-                    if check_initial(*new_node):
-                        return True
-
-                    all_attractor_nodes.add(new_node)
-                    new_attractor_nodes.add(new_node)
-                else:
-                    # Add all not in attractor successor nodes to the list of seen player 2 nodes that are
-                    # not in the attractor, so we can check later if we possibly add some of them to the attractor,
-                    # if we have also add the new node to the attractor.
-                    seen_player2_nodes_not_in_attractor.add_many(new_node, successors_not_in_attractor)
-
             elif m == MOVES[MOVE]:
-                # TODO alle nochfolger bestimmen
-                pass
+                b = w[-1]
+                vv = w[:-1]
+
+                for q in self.automatons[1 - i].get_successors(s=state_pair[1 - i], a=b):
+                    new_state_pair = (state_pair[0], q) if i == 0 else (q, state_pair[1])
+                    successor_node = (new_state_pair, vv, 1 - i, MOVES[CHOICE])
+
+                    if successor_node not in all_attractor_nodes:
+                        successors_not_in_attractor.add(successor_node)
+
+            # Check if all successors nodes are in the attractor, then player 2 have no choice to don't play into
+            # the attractor.
+            if not successors_not_in_attractor:
+
+                if check_initial(*new_node):
+                    return True
+
+                all_attractor_nodes.add(new_node)
+                new_attractor_nodes.add(new_node)
+            else:
+                # Add all not in attractor successor nodes to the list of seen player 2 nodes that are
+                # not in the attractor, so we can check later if we possibly add some of them to the attractor,
+                # if we have also add the new node to the attractor.
+                seen_player2_nodes_not_in_attractor.add_many(new_node, successors_not_in_attractor)
 
             return False
 
