@@ -76,8 +76,11 @@ class BufferedBisimulationGames(BisimulationGames):
             successors_not_in_attractor = set()
 
             if m == MOVES[FLUSH]:
+                used_automaton: FiniteAutomata = self.automatons[1 - i]
+                current_state = state_pair[1 - i]
+
                 # Compute all states that can be reached by flushing the buffer
-                successors = used_automaton.get_successors(s=p, a=w[0]) if w else {p}
+                successors = used_automaton.get_successors(s=current_state, a=w[0]) if w else {current_state}
                 for letter in w[1:]:
                     successors = {
                         successor
@@ -99,7 +102,7 @@ class BufferedBisimulationGames(BisimulationGames):
 
                 for q in self.automatons[1 - i].get_successors(s=state_pair[1 - i], a=b):
                     new_state_pair = (state_pair[0], q) if i == 0 else (q, state_pair[1])
-                    successor_node = (new_state_pair, vv, 1 - i, MOVES[CHOICE])
+                    successor_node = (new_state_pair, vv, i, MOVES[CHOICE])
 
                     if successor_node not in all_attractor_nodes:
                         successors_not_in_attractor.add(successor_node)
