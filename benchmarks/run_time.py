@@ -4,7 +4,7 @@ from time import perf_counter
 from wofa import get_solution, FiniteAutomata, SubmissionIterator
 from bubbles import BufferedBisimulationGames
 
-MAX_BUFFER_SIZE = 3
+MAX_BUFFER_SIZE = 4
 
 TASKS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M']
 
@@ -27,7 +27,7 @@ if __name__ == '__main__':
     runtimes_b_buffer = defaultdict(list)
     # Store the measured runtimes of the plain language-equivalence test.
     runtimes_eq_test = []
-    # Count how many submissions are k-buffer equivalent to the solution.
+    # Count how many submissions are k-bisimilar to the solution.
     number_of_k_buff_sims = defaultdict(int)
     # Count all processed submissions, including non-parseable ones.
     number_of_submissions = 0
@@ -95,7 +95,7 @@ if __name__ == '__main__':
                 # equivalent if plain language equivalence already failed.
                 if one_buf_sim and not equivalent:
                     raise Exception(
-                        'Found a submission that is not equivalent but 1 buffered equivalent to the solution')
+                        'Found a submission that is not equivalent but 1-bisimilar to the solution')
 
                 if one_buf_sim:
                     number_of_k_buff_sims[1] += 1
@@ -116,7 +116,7 @@ if __name__ == '__main__':
                     # Again guard against impossible outcomes.
                     if k_buf_sim and not equivalent:
                         raise Exception(
-                            f'Found a submission that is not equivalent but {k} buffered equivalent to the solution')
+                            f'Found a submission that is not equivalent but {k}-bisimilar to the solution')
 
                     if k_buf_sim:
                         number_of_k_buff_sims[k] += 1
@@ -143,7 +143,7 @@ if __name__ == '__main__':
         print('Average equivalence-test runtime: no measurements recorded')
 
     print()
-    print('Buffered Bisimulation')
+    print('k-Bisimilarity')
     print('---------------------')
     for k in range(1, MAX_BUFFER_SIZE + 1):
         runtimes = runtimes_b_buffer[k]
@@ -152,8 +152,10 @@ if __name__ == '__main__':
         if runtimes:
             avg_runtime = sum(runtimes) / len(runtimes)
             print(
-                f'k={k}: {number_of_equivalent} equivalent, '
+                f'k={k}: {number_of_equivalent} k-bisimilar, '
                 f'{len(runtimes)} measured runs, average runtime {avg_runtime:.6f}s'
             )
         else:
             print(f'k={k}: no measurements recorded')
+
+
