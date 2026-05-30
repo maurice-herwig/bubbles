@@ -30,21 +30,9 @@ class BufferedBisimulationGames(BisimulationGames):
                       for i in range(2)}
         initials = {i: self.automatons[i].get_initials() for i in range(2)}
 
-        def new_player1_node(state_pair: tuple, w: str, i: int, m: int):
-            new_node = (state_pair, w, i, m)
-
-            if new_node in all_attractor_nodes:
-                return False
-
-            if check_initial(*new_node):
-                return True
-
-            all_attractor_nodes.add(new_node)
-            new_attractor_nodes.add(new_node)
-            propagated_nodes = [new_node]
-
-            while propagated_nodes:
-                propagated_node = propagated_nodes.pop()
+        def propagate_new_attractor_nodes(nodes: list[tuple]) -> bool:
+            while nodes:
+                propagated_node = nodes.pop()
 
                 if not seen_player2_nodes_not_in_attractor.has_value(propagated_node):
                     continue
@@ -60,9 +48,22 @@ class BufferedBisimulationGames(BisimulationGames):
 
                     all_attractor_nodes.add(new_player_2_attractor_node)
                     new_attractor_nodes.add(new_player_2_attractor_node)
-                    propagated_nodes.append(new_player_2_attractor_node)
+                    nodes.append(new_player_2_attractor_node)
 
             return False
+
+        def new_player1_node(state_pair: tuple, w: str, i: int, m: int):
+            new_node = (state_pair, w, i, m)
+
+            if new_node in all_attractor_nodes:
+                return False
+
+            if check_initial(*new_node):
+                return True
+
+            all_attractor_nodes.add(new_node)
+            new_attractor_nodes.add(new_node)
+            return propagate_new_attractor_nodes([new_node])
 
         def new_player2_node(state_pair: tuple, w: str, i: int, m: int):
             new_node = (state_pair, w, i, m)
@@ -97,6 +98,9 @@ class BufferedBisimulationGames(BisimulationGames):
                         successors_not_in_attractor.add(successor_node)
 
             elif m == MOVES[MOVE]:
+                if not w:
+                    return False
+
                 b = w[-1]
                 vv = w[:-1]
 
@@ -116,6 +120,8 @@ class BufferedBisimulationGames(BisimulationGames):
 
                 all_attractor_nodes.add(new_node)
                 new_attractor_nodes.add(new_node)
+                if propagate_new_attractor_nodes([new_node]):
+                    return True
             else:
                 # Add all not in attractor successor nodes to the list of seen player 2 nodes that are
                 # not in the attractor, so we can check later if we possibly add some of them to the attractor,
