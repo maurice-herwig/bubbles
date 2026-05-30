@@ -33,8 +33,54 @@ class BufferedBisimulationGames(BisimulationGames):
     def __init__(self, automaton0: FiniteAutomata, automaton1: FiniteAutomata, buffer_size: int):
         """Create the game instance for two NFA and a buffer of size k."""
         assert buffer_size >= 1, "Buffer size must be at least 1"
-        super().__init__(automaton0, automaton1)
         self.buffer_size = buffer_size
+        super().__init__(automaton0, automaton1)
+        self.__prepare_automatons()
+
+    def __prepare_automatons(self):
+        """Normalize both input automata to the game assumptions.
+
+        Before the attractor construction starts, each automaton is prepared so
+        that the game operates on a clean and uniform representation:
+
+        1. remove transitions whose labels are not part of the common alphabet,
+        2. remove unreachable states,
+        3. normalize the set of initial states to a single initial state,
+        4. totalize the automaton by adding a dead state if some transition is
+           missing.
+
+        The last step is important because the backward game construction
+        assumes that player-II response moves are always represented by regular
+        successors in the automaton, rather than by an implicit "no move"
+        situation.
+        """
+        for i in range(2):
+            # Keep only transitions over the agreed alphabet of the game.
+            self.automatons[i].remove_non_alphabet_transitions()
+
+            # States that cannot be reached from the start configuration never
+            # matter for the game graph.
+            self.automatons[i].remove_unreachable_states()
+
+            # If the automaton has multiple initials, we merge them into one equivalent start state.
+            self.automatons[i].normalize_initial_states()
+
+            # Check whether the automaton is already total, i.e. whether every
+            # state has at least one outgoing transition for every letter.
+            total = True
+            for letter in FiniteAutomata.alphabet:
+                for state in range(self.automatons[i].get_number_of_states()):
+                    if not self.automatons[i].get_successors(s=state, a=letter):
+                        total = False
+                        break
+                if not total:
+                    break
+
+            # If some transition is missing, add a dead state to totalize the
+            # automaton. Missing player-II responses are then represented by a
+            # transition into this dead sink instead of by undefined behavior.
+            if not total:
+                self.automatons[i].add_dead_state()
 
     def solve(self):
         """Return whether player II wins the k-buffered bisimulation game.
@@ -85,13 +131,12 @@ class BufferedBisimulationGames(BisimulationGames):
             currently treats the initial-state component as a set membership
             test instead of assuming a single initial state.
             """
-            # TODO im Aufschrieb gebt es für NFAs nur einen Startzustand, aber die API erlaubt mehrere.
             return (
-                node_state_pair[0] in initials[0]
-                and node_state_pair[1] in initials[1]
-                and buffer_word == ''
-                and automaton_index == 0
-                and move_type == MOVES[CHOICE]
+                    node_state_pair[0] in initials[0]
+                    and node_state_pair[1] in initials[1]
+                    and buffer_word == ''
+                    and automaton_index == 0
+                    and move_type == MOVES[CHOICE]
             )
 
         def propagate_new_attractor_nodes(nodes_to_process: list[tuple]) -> bool:
@@ -464,7 +509,7 @@ class BufferedBisimulationGames(BisimulationGames):
                             return False, f'The automatas are not {self.buffer_size}-buffer equivalent'
 
                         for predecessor_state, predecessor_letter in self.automatons[
-                                1 - automaton_index].get_all_predecessors_with_letter(
+                            1 - automaton_index].get_all_predecessors_with_letter(
                             s=state_pair[1 - automaton_index]
                         ):
                             predecessor_state_pair = (
@@ -565,4 +610,3 @@ class BufferedBisimulationGames(BisimulationGames):
         # If the initial node never entered the player-I attractor, then player
         # II can avoid F forever and therefore has a winning strategy.
         return True, f'The automatas are {self.buffer_size}-buffer equivalent'
-
