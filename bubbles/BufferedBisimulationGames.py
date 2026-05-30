@@ -85,6 +85,7 @@ class BufferedBisimulationGames(BisimulationGames):
             currently treats the initial-state component as a set membership
             test instead of assuming a single initial state.
             """
+            # TODO im Aufschrieb gebt es für NFAs nur einen Startzustand, aber die API erlaubt mehrere.
             return (
                 node_state_pair[0] in initials[0]
                 and node_state_pair[1] in initials[1]
