@@ -36,7 +36,15 @@ class BufferedBisimulationGames(BisimulationGames):
             if new_node in all_attractor_nodes:
                 return False
 
-            # TODO überpüfen ob er aus der liste einer von player 2 nodes genommen werden kann die noch nicht im Attraktor sind.
+            if seen_player2_nodes_not_in_attractor.has_value(new_node):
+                for new_player_2_attractor_node in seen_player2_nodes_not_in_attractor.remove_value_everywhere(
+                        new_node):
+
+                    if check_initial(*new_player_2_attractor_node):
+                        return True
+
+                    all_attractor_nodes.add(new_player_2_attractor_node)
+                    new_attractor_nodes.add(new_player_2_attractor_node)
 
             if check_initial(*new_node):
                 return True
@@ -51,7 +59,8 @@ class BufferedBisimulationGames(BisimulationGames):
             if new_node in all_attractor_nodes:
                 return False
 
-            # TODO Liste mit allen bereits gesehenen player 2 nodes, die nicht im attraktor sind.
+            if seen_player2_nodes_not_in_attractor.has_value(new_node):
+                return False
 
             if m == MOVES[FLUSH]:
                 if new_node in all_attractor_nodes:
@@ -90,7 +99,6 @@ class BufferedBisimulationGames(BisimulationGames):
                     # if we have also add the new node to the attractor.
                     seen_player2_nodes_not_in_attractor.add_many(new_node, successors_not_in_attractor)
 
-                    print(seen_player2_nodes_not_in_attractor)
             elif m == MOVES[MOVE]:
                 # TODO alle nochfolger bestimmen
                 pass
