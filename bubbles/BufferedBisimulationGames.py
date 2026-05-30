@@ -232,7 +232,7 @@ class BufferedBisimulationGames(BisimulationGames):
 
                         # Für alle Flush nodes die möglichen nachfolger nodes bestimmen
                         for p, v in pos_flash:
-                            new_state_pair = (state_pair[0], p) if i == 0 else (p, state_pair[1])
+                            new_state_pair = (p, state_pair[1]) if i == 0 else (state_pair[0], p)
                             if new_player2_node(state_pair=new_state_pair, w=v, i=(1 - i), m=MOVES[FLUSH]):
                                 return False, f'The automatas are not {self.buffer_size}-buffer equivalent'
 
