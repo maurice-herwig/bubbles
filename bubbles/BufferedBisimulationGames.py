@@ -82,6 +82,11 @@ class BufferedBisimulationGames(BisimulationGames):
             if not total:
                 self.automatons[i].add_dead_state()
 
+    def set_buffer_size(self, buffer_size: int):
+        """Set the buffer size for the game."""
+        assert buffer_size >= 1, "Buffer size must be at least 1"
+        self.buffer_size = buffer_size
+
     def solve(self):
         """Return whether player II wins the k-buffered bisimulation game.
 

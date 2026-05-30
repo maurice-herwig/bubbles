@@ -11,3 +11,6 @@ class BisimulationGames(ABC):
     @abstractmethod
     def solve(self):
         pass
+
+    def get_automatons(self):
+        return self.automatons
