@@ -36,21 +36,32 @@ class BufferedBisimulationGames(BisimulationGames):
             if new_node in all_attractor_nodes:
                 return False
 
-            if seen_player2_nodes_not_in_attractor.has_value(new_node):
+            if check_initial(*new_node):
+                return True
+
+            all_attractor_nodes.add(new_node)
+            new_attractor_nodes.add(new_node)
+            propagated_nodes = [new_node]
+
+            while propagated_nodes:
+                propagated_node = propagated_nodes.pop()
+
+                if not seen_player2_nodes_not_in_attractor.has_value(propagated_node):
+                    continue
+
                 for new_player_2_attractor_node in seen_player2_nodes_not_in_attractor.remove_value_everywhere(
-                        new_node):
+                        propagated_node):
+
+                    if new_player_2_attractor_node in all_attractor_nodes:
+                        continue
 
                     if check_initial(*new_player_2_attractor_node):
                         return True
 
                     all_attractor_nodes.add(new_player_2_attractor_node)
                     new_attractor_nodes.add(new_player_2_attractor_node)
+                    propagated_nodes.append(new_player_2_attractor_node)
 
-            if check_initial(*new_node):
-                return True
-
-            all_attractor_nodes.add(new_node)
-            new_attractor_nodes.add(new_node)
             return False
 
         def new_player2_node(state_pair: tuple, w: str, i: int, m: int):
@@ -59,7 +70,7 @@ class BufferedBisimulationGames(BisimulationGames):
             if new_node in all_attractor_nodes:
                 return False
 
-            if seen_player2_nodes_not_in_attractor.has_value(new_node):
+            if seen_player2_nodes_not_in_attractor.has_key(new_node):
                 return False
 
             successors_not_in_attractor = set()
