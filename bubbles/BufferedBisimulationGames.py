@@ -144,7 +144,7 @@ class BufferedBisimulationGames(BisimulationGames):
         for p in non_finals[0]:
             for q in finals[1]:
                 for i in range(2):
-                    for m in range(4):
+                    for m in range(3):
                         new_node = ((p, q), '', i, m)
                         if check_initial(*new_node):
                             return False, f'The automatas are not {self.buffer_size}-buffer equivalent'
@@ -174,9 +174,10 @@ class BufferedBisimulationGames(BisimulationGames):
                             return False, f'The automatas are not {self.buffer_size}-buffer equivalent'
 
                         # case plyer 2
-                        for q, a in self.automatons[1 - i].get_all_predecessors_with_letter(s=state_pair[1 - 1]):
+                        for q, a in self.automatons[1 - i].get_all_predecessors_with_letter(s=state_pair[1 - i]):
                             new_state_pair = (state_pair[0], q) if i == 0 else (q, state_pair[1])
-                            new_player2_node(state_pair=new_state_pair, w=buffer_word + a, i=i, m=MOVES[MOVE])
+                            if new_player2_node(state_pair=new_state_pair, w=buffer_word + a, i=i, m=MOVES[MOVE]):
+                                return False, f'The automatas are not {self.buffer_size}-buffer equivalent'
 
                     elif (self.buffer_size - 1) > n > 0:
                         # kann nur von 1 dahin gespielt worden sein
