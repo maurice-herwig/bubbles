@@ -109,7 +109,7 @@ class BufferedBisimulationGames(BisimulationGames):
 
         Returns:
             tuple[bool, str]:
-                True  if player II wins, i.e. the automata are k-buffer equivalent.
+                True  if player II wins, i.e. the automata are k-buffer bisimilar.
                 False if player I wins, i.e. the initial node is in the attractor.
         """
 
@@ -451,7 +451,7 @@ class BufferedBisimulationGames(BisimulationGames):
                     for move_type in range(3):
                         new_node = ((left_final_state, right_non_final_state), '', automaton_index, move_type)
                         if check_initial(*new_node):
-                            return False, f'The automatas are not {self.buffer_size}-buffer equivalent'
+                            return False, f'The automatas are not {self.buffer_size}-buffer bisimilar'
 
                         all_attractor_nodes.add(new_node)
 
@@ -461,7 +461,7 @@ class BufferedBisimulationGames(BisimulationGames):
                     for move_type in range(3):
                         new_node = ((left_non_final_state, right_final_state), '', automaton_index, move_type)
                         if check_initial(*new_node):
-                            return False, f'The automatas are not {self.buffer_size}-buffer equivalent'
+                            return False, f'The automatas are not {self.buffer_size}-buffer bisimilar'
 
                         all_attractor_nodes.add(new_node)
 
@@ -496,7 +496,7 @@ class BufferedBisimulationGames(BisimulationGames):
                                 extended_buffer_word=current_buffer_word,
                                 automaton_index=automaton_index,
                         ):
-                            return False, f'The automatas are not {self.buffer_size}-buffer equivalent'
+                            return False, f'The automatas are not {self.buffer_size}-buffer bisimilar'
 
                     elif buffer_length == (self.buffer_size - 1):
                         # This is the mixed boundary case. A choice node with
@@ -511,7 +511,7 @@ class BufferedBisimulationGames(BisimulationGames):
                                 extended_buffer_word=current_buffer_word,
                                 automaton_index=automaton_index,
                         ):
-                            return False, f'The automatas are not {self.buffer_size}-buffer equivalent'
+                            return False, f'The automatas are not {self.buffer_size}-buffer bisimilar'
 
                         for predecessor_state, predecessor_letter in self.automatons[
                             1 - automaton_index].get_all_predecessors_with_letter(
@@ -528,7 +528,7 @@ class BufferedBisimulationGames(BisimulationGames):
                                     automaton_index=automaton_index,
                                     move_type=MOVES[MOVE],
                             ):
-                                return False, f'The automatas are not {self.buffer_size}-buffer equivalent'
+                                return False, f'The automatas are not {self.buffer_size}-buffer bisimilar'
 
                     elif (self.buffer_size - 1) > buffer_length > 0:
                         # If 0 < |w| < k - 1, only the player-I move rule can
@@ -538,7 +538,7 @@ class BufferedBisimulationGames(BisimulationGames):
                                 extended_buffer_word=current_buffer_word,
                                 automaton_index=automaton_index,
                         ):
-                            return False, f'The automatas are not {self.buffer_size}-buffer equivalent'
+                            return False, f'The automatas are not {self.buffer_size}-buffer bisimilar'
 
                 elif move_type == MOVES[FLUSH]:
                     # Reverse of
@@ -553,7 +553,7 @@ class BufferedBisimulationGames(BisimulationGames):
                             automaton_index=automaton_index,
                             move_type=MOVES[CHOICE],
                     ):
-                        return False, f'The automatas are not {self.buffer_size}-buffer equivalent'
+                        return False, f'The automatas are not {self.buffer_size}-buffer bisimilar'
 
                 elif move_type == MOVES[MOVE]:
                     # Reverse of
@@ -568,7 +568,7 @@ class BufferedBisimulationGames(BisimulationGames):
                             automaton_index=automaton_index,
                             move_type=MOVES[CHOICE],
                     ):
-                        return False, f'The automatas are not {self.buffer_size}-buffer equivalent'
+                        return False, f'The automatas are not {self.buffer_size}-buffer bisimilar'
 
                     # Reverse of the flush rule can only target a move node with
                     # empty buffer:
@@ -607,11 +607,11 @@ class BufferedBisimulationGames(BisimulationGames):
                                     automaton_index=(1 - automaton_index),
                                     move_type=MOVES[FLUSH],
                             ):
-                                return False, f'The automatas are not {self.buffer_size}-buffer equivalent'
+                                return False, f'The automatas are not {self.buffer_size}-buffer bisimilar'
 
             last_added_attractor_nodes = new_attractor_nodes.copy()
             new_attractor_nodes = set()
 
         # If the initial node never entered the player-I attractor, then player
         # II can avoid F forever and therefore has a winning strategy.
-        return True, f'The automatas are {self.buffer_size}-buffer equivalent'
+        return True, f'The automatas are {self.buffer_size}-buffer bisimilar'
