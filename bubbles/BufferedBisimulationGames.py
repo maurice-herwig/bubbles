@@ -67,16 +67,7 @@ class BufferedBisimulationGames(BisimulationGames):
                 False if player I wins, i.e. the initial node is in the attractor.
         """
 
-        finals = {index: self.automatons[index].get_finals() for index in range(2)}
-        non_finals = {
-            index: {
-                state
-                for state in range(self.automatons[index].get_number_of_states())
-                if state not in finals[index]
-            }
-            for index in range(2)
-        }
-        initials = {index: self.automatons[index].get_initials() for index in range(2)}
+
 
         def check_initial(
                 node_state_pair: tuple, buffer_word: str, automaton_index: int, move_type: int):
@@ -91,8 +82,8 @@ class BufferedBisimulationGames(BisimulationGames):
             test instead of assuming a single initial state.
             """
             return (
-                    node_state_pair[0] in initials[0]
-                    and node_state_pair[1] in initials[1]
+                    node_state_pair[0] in self.initials[0]
+                    and node_state_pair[1] in self.initials[1]
                     and buffer_word == ''
                     and automaton_index == 0
                     and move_type == MOVES[CHOICE]
@@ -399,8 +390,8 @@ class BufferedBisimulationGames(BisimulationGames):
         # so the code works with exactly these three move kinds.
         all_attractor_nodes = set()
 
-        for left_final_state in finals[0]:
-            for right_non_final_state in non_finals[1]:
+        for left_final_state in self.finals[0]:
+            for right_non_final_state in self.non_finals[1]:
                 for automaton_index in range(2):
                     for move_type in range(3):
                         new_node = ((left_final_state, right_non_final_state), '', automaton_index, move_type)
@@ -409,8 +400,8 @@ class BufferedBisimulationGames(BisimulationGames):
 
                         all_attractor_nodes.add(new_node)
 
-        for left_non_final_state in non_finals[0]:
-            for right_final_state in finals[1]:
+        for left_non_final_state in self.non_finals[0]:
+            for right_final_state in self.finals[1]:
                 for automaton_index in range(2):
                     for move_type in range(3):
                         new_node = ((left_non_final_state, right_final_state), '', automaton_index, move_type)

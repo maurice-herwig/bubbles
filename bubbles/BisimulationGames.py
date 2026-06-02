@@ -9,6 +9,18 @@ class BisimulationGames(ABC):
         self.automatons = {0: automaton0, 1: automaton1}
         self.__prepare_automatons()
 
+        # Precompute the sets of final, non-final, and initial states for both automata to speed up the game solving.
+        self.finals = {index: self.automatons[index].get_finals() for index in range(2)}
+        self.non_finals = {
+            index: {
+                state
+                for state in range(self.automatons[index].get_number_of_states())
+                if state not in self.finals[index]
+            }
+            for index in range(2)
+        }
+        self.initials = {index: self.automatons[index].get_initials() for index in range(2)}
+
     def __prepare_automatons(self):
         """Normalize both input automata to the game assumptions.
 
