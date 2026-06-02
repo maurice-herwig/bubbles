@@ -20,7 +20,7 @@ if __name__ == '__main__':
 
     multi_pebble_bisimulation_game = MultiPebbleBisimulationGames(automaton0=automaton0,
                                                                   automaton1=automaton1,
-                                                                  pebbles=1)
+                                                                  pebbles=3)
     print(multi_pebble_bisimulation_game.solve())
 
     """

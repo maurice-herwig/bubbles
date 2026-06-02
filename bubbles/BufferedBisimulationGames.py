@@ -67,8 +67,6 @@ class BufferedBisimulationGames(BisimulationGames):
                 False if player I wins, i.e. the initial node is in the attractor.
         """
 
-
-
         def check_initial(
                 node_state_pair: tuple, buffer_word: str, automaton_index: int, move_type: int):
             """Check whether the current node is the initial game position.
