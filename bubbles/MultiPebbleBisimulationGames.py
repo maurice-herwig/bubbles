@@ -74,8 +74,36 @@ class MultiPebbleBisimulationGames(BisimulationGames):
             )
 
         def new_player_2_node(parameter0, parameter1, move_type):
-            # TODO
-            pass
+            new_node = (parameter0, parameter1, move_type)
+
+            if new_node in all_attractor_nodes:
+                return False
+
+            # If we already recorded this player-II node together with its
+            # currently unresolved successors, we do not recompute it.
+            if seen_player2_nodes_not_in_attractor.has_key(new_node):
+                return False
+
+            if isinstance(parameter0, int):
+                q = parameter0
+                m = parameter1
+                i = 0
+            else:
+                q = parameter1
+                m = parameter0
+                i = 1
+
+            successors_not_in_attractor = set()
+
+            if move_type == MOVES[COLL]:
+                # TODO
+                pass
+
+            elif move_type in FiniteAutomata.alphabet:
+                all_successor_states = {succ for p in m for succ in
+                                        self.automatons[1 - i].get_successors(s=p, a=move_type)}
+
+                # TODO alle Teilmengen von all_successor_states bestimmen die mindestens ein Element enthalten oder maximal self.pebbles elements enthalten bestimmten.
 
         # TODO überprüfen, ob beim starten wie aktuell minimal ein pebble gesetzt sein muss oder auch 0 gehen.
         for final_state in self.finals[0]:
@@ -141,11 +169,11 @@ class MultiPebbleBisimulationGames(BisimulationGames):
             for parameter0, parameter1, move_type in last_added_attractor_nodes:
                 if isinstance(parameter0, int):
                     q = parameter0
-                    M = parameter1
+                    m = parameter1
                     i = 0
                 else:
                     q = parameter1
-                    M = parameter0
+                    m = parameter0
                     i = 1
 
                 if move_type == MOVES[CHOICE]:
@@ -164,7 +192,7 @@ class MultiPebbleBisimulationGames(BisimulationGames):
                         # cover M under the recorded letter.
                         predecessor_map = {
                             p: self.automatons[1 - i].get_predecessors(s=p, a=letter)
-                            for p in M
+                            for p in m
                         }
 
                         # First build minimal predecessor sets by choosing one
@@ -233,8 +261,8 @@ class MultiPebbleBisimulationGames(BisimulationGames):
                     # of the current move node is a singleton. We then rebuild
                     # every possible collapsed predecessor set containing the
                     # current single state `q`, with size at most k.
-                    if len(M) == 1:
-                        q_in_M = next(iter(M))
+                    if len(m) == 1:
+                        q_in_M = next(iter(m))
 
                         not_q_states = set(self.states[i]) - {q}
 
@@ -281,10 +309,10 @@ class MultiPebbleBisimulationGames(BisimulationGames):
                     # single pebble under the recorded letter `move_type`.
                     for predecessor in self.automatons[i].get_predecessors(s=q, a=move_type):
                         if i == 0:
-                            if new_player_1_node(parameter0=predecessor, parameter1=M, move_type=MOVES[MOVE]):
+                            if new_player_1_node(parameter0=predecessor, parameter1=m, move_type=MOVES[MOVE]):
                                 return False, f'The automatons are not {self.pebbles}-pebble bisimilar'
                         else:
-                            if new_player_1_node(parameter0=M, parameter1=predecessor, move_type=MOVES[MOVE]):
+                            if new_player_1_node(parameter0=m, parameter1=predecessor, move_type=MOVES[MOVE]):
                                 return False, f'The automatons are not {self.pebbles}-pebble bisimilar'
 
             last_added_attractor_nodes = new_attractor_nodes.copy()
