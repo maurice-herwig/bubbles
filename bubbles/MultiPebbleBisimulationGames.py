@@ -7,7 +7,26 @@ from .TwoWaySetMap import TwoWaySetMap
 CHOICE = "CHOICE"
 MOVE = "MOVE"
 COLL = "COLL"
-MOVES = {CHOICE: 0, MOVE: 1, COLL: 2}
+
+
+def _build_move_mapping() -> dict[str, int]:
+    """Assign move-type integers that cannot collide with alphabet symbols."""
+    used_values = set(FiniteAutomata.alphabet)
+    move_mapping = {}
+    candidate = 0
+
+    for move_type in (CHOICE, MOVE, COLL):
+        while candidate in used_values:
+            candidate += 1
+
+        move_mapping[move_type] = candidate
+        used_values.add(candidate)
+        candidate += 1
+
+    return move_mapping
+
+
+MOVES = _build_move_mapping()
 
 
 class MultiPebbleBisimulationGames(BisimulationGames):
