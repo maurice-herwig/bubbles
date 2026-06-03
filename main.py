@@ -20,14 +20,18 @@ if __name__ == '__main__':
 
     multi_pebble_bisimulation_game = MultiPebbleBisimulationGames(automaton0=automaton0,
                                                                   automaton1=automaton1,
-                                                                  pebbles=3)
-    print(multi_pebble_bisimulation_game.solve())
+                                                                  pebbles=1)
 
-    """
     buffered_bisimulation_game = BufferedBisimulationGames(automaton0=automaton0, automaton1=automaton1, buffer_size=1)
+
+    print()
     print(buffered_bisimulation_game.solve())
+    print(multi_pebble_bisimulation_game.solve())
+    print()
 
     for i in range(2, 6):
         buffered_bisimulation_game.set_buffer_size(buffer_size=i)
+        multi_pebble_bisimulation_game.set_pebbles(pebbles=i)
         print(buffered_bisimulation_game.solve())
-    """
+        print(multi_pebble_bisimulation_game.solve())
+        print()
