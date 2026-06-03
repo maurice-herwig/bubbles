@@ -1,5 +1,5 @@
 from wofa import FiniteAutomata
-from itertools import combinations
+from itertools import combinations, product
 
 from .BisimulationGames import BisimulationGames
 from .TwoWaySetMap import TwoWaySetMap
@@ -149,7 +149,41 @@ class MultiPebbleBisimulationGames(BisimulationGames):
                     i = 1
 
                 if move_type == MOVES[CHOICE]:
-                    pass
+                    for letter in FiniteAutomata.alphabet:
+                        predecessor_map = {
+                            p: self.automatons[1 - i].get_predecessors(s=p, a=letter)
+                            for p in M
+                        }
+
+                        # Step 1: build minimal predecessor sets for the
+                        # player-II response edge
+                        #
+                        #   (..., M_old, a) -> (..., M, choice)
+                        #
+                        # by choosing one predecessor for every target pebble
+                        # in the current set M. Each generated set therefore
+                        # hits every predecessor option in `predecessor_map`.
+                        #
+                        # These sets are only minimal witnesses. They do not
+                        # yet include cases where the old pebble set contains
+                        # additional states, including multiple predecessors
+                        # from the same predecessor option. Step 2 must
+                        # therefore extend each minimal set with arbitrary
+                        # further states from self.states[1 - i] up to size k.
+                        predecessor_sets = set()
+                        predecessor_options = list(predecessor_map.values())
+
+                        if all(predecessor_options):
+                            for predecessor_choice in product(*predecessor_options):
+                                predecessor_set = frozenset(predecessor_choice)
+
+                                if len(predecessor_set) <= self.pebbles:
+                                    predecessor_sets.add(predecessor_set)
+
+                        #2. Für diejenigen die noch nicht self.pebbles elemente enthalten weiter pebbles hinzufügen
+
+                        #3. Für alle so gefundene ein die Hilfsfunktion new_player_2_node aufrufen
+
 
                 elif move_type == MOVES[MOVE]:
                     # Reverse of the player-I choice-to-move edge:
