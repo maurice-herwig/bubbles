@@ -150,26 +150,27 @@ class MultiPebbleBisimulationGames(BisimulationGames):
 
                 if move_type == MOVES[CHOICE]:
                     for letter in FiniteAutomata.alphabet:
+                        # Reverse of the player-II response edge:
+                        #
+                        #   (q0, M1_old, a) -> (q0, M1, choice)
+                        #
+                        # where M1 is chosen from the a-successors of M1_old,
+                        # and symmetrically:
+                        #
+                        #   (M0_old, q1, a) -> (M0, q1, choice)
+                        #
+                        # The current set M is the chosen successor set. We
+                        # therefore reconstruct all old pebble sets that could
+                        # cover M under the recorded letter.
                         predecessor_map = {
                             p: self.automatons[1 - i].get_predecessors(s=p, a=letter)
                             for p in M
                         }
 
-                        # Step 1: build minimal predecessor sets for the
-                        # player-II response edge
-                        #
-                        #   (..., M_old, a) -> (..., M, choice)
-                        #
-                        # by choosing one predecessor for every target pebble
-                        # in the current set M. Each generated set therefore
-                        # hits every predecessor option in `predecessor_map`.
-                        #
-                        # These sets are only minimal witnesses. They do not
-                        # yet include cases where the old pebble set contains
-                        # additional states, including multiple predecessors
-                        # from the same predecessor option. Step 2 must
-                        # therefore extend each minimal set with arbitrary
-                        # further states from self.states[1 - i] up to size k.
+                        # First build minimal predecessor sets by choosing one
+                        # predecessor for every target pebble in M. A single
+                        # old state may cover several target pebbles, so the
+                        # resulting frozensets can be smaller than M.
                         predecessor_sets = set()
                         predecessor_options = list(predecessor_map.values())
 
@@ -180,10 +181,31 @@ class MultiPebbleBisimulationGames(BisimulationGames):
                                 if len(predecessor_set) <= self.pebbles:
                                     predecessor_sets.add(predecessor_set)
 
-                        #2. Für diejenigen die noch nicht self.pebbles elemente enthalten weiter pebbles hinzufügen
+                        if not predecessor_sets:
+                            continue
 
-                        #3. Für alle so gefundene ein die Hilfsfunktion new_player_2_node aufrufen
+                        # Then add all supersets up to size k, because Player
+                        # II may have carried additional old pebbles that were
+                        # not needed to produce the current successor set M.
+                        extended_predecessor_sets = set(predecessor_sets)
 
+                        for predecessor_set in predecessor_sets:
+                            missing_states = self.states[1 - i] - predecessor_set
+                            remaining_capacity = self.pebbles - len(predecessor_set)
+
+                            for r in range(1, remaining_capacity + 1):
+                                for additional_states in combinations(missing_states, r):
+                                    extended_predecessor_sets.add(
+                                        frozenset(predecessor_set | set(additional_states))
+                                    )
+
+                        for predecessor_set in extended_predecessor_sets:
+                            if i == 0:
+                                if new_player_2_node(parameter0=q, parameter1=predecessor_set, move_type=letter):
+                                    return False, f'The automatons are not {self.pebbles}-pebble bisimilar'
+                            else:
+                                if new_player_2_node(parameter0=predecessor_set, parameter1=q, move_type=letter):
+                                    return False, f'The automatons are not {self.pebbles}-pebble bisimilar'
 
                 elif move_type == MOVES[MOVE]:
                     # Reverse of the player-I choice-to-move edge:
