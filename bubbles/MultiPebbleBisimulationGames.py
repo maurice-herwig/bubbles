@@ -148,8 +148,21 @@ class MultiPebbleBisimulationGames(BisimulationGames):
                     pass
 
                 elif move_type == MOVES[MOVE]:
+                    # Reverse of the player-I choice-to-move edge:
+                    #
+                    #   (q0, M1, choice) -> (q0, M1, move)
+                    #
+                    # and symmetrically:
+                    #
+                    #   (M0, q1, choice) -> (M0, q1, move)
+                    #
+                    # Since `choice` is owned by player I, this predecessor is
+                    # existential and can be added directly to the attractor.
+                    if new_player_1_node(parameter0=parameter0, parameter1=parameter1, move_type=MOVES[CHOICE]):
+                        return False, f'The automatons are not {self.pebbles}-pebble bisimilar'
+
+                    # Fall Player 2 hat zu move gespielt:
                     # TODO
-                    pass
 
                 elif move_type == MOVES[COLL]:
                     # Reverse of the player-I choice-to-collapse edge:
@@ -179,10 +192,10 @@ class MultiPebbleBisimulationGames(BisimulationGames):
                     # single pebble under the recorded letter `move_type`.
                     for predecessor in self.automatons[i].get_predecessors(s=q, a=move_type):
                         if i == 0:
-                            if new_player_1_node(parameter0=predecessor, parameter1=parameter1, move_type=MOVES[MOVE]):
+                            if new_player_1_node(parameter0=predecessor, parameter1=M, move_type=MOVES[MOVE]):
                                 return False, f'The automatons are not {self.pebbles}-pebble bisimilar'
                         else:
-                            if new_player_1_node(parameter0=parameter0, parameter1=predecessor, move_type=MOVES[MOVE]):
+                            if new_player_1_node(parameter0=M, parameter1=predecessor, move_type=MOVES[MOVE]):
                                 return False, f'The automatons are not {self.pebbles}-pebble bisimilar'
 
             last_added_attractor_nodes = new_attractor_nodes.copy()
