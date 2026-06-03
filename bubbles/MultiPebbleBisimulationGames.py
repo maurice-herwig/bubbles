@@ -165,6 +165,26 @@ class MultiPebbleBisimulationGames(BisimulationGames):
                     if new_player_1_node(parameter0=parameter0, parameter1=parameter1, move_type=MOVES[CHOICE]):
                         return False, f'The automatons are not {self.pebbles}-pebble bisimilar'
 
+                elif move_type in FiniteAutomata.alphabet:
+
+                    # Reverse of the player-I move edge:
+                    #
+                    #   (q0, M1, move) -> (q0', M1, a)
+                    #
+                    # and symmetrically:
+                    #
+                    #   (M0, q1, move) -> (M0, q1', a)
+                    #
+                    # We therefore enumerate all predecessors of the moved
+                    # single pebble under the recorded letter `move_type`.
+                    for predecessor in self.automatons[i].get_predecessors(s=q, a=move_type):
+                        if i == 0:
+                            if new_player_1_node(parameter0=predecessor, parameter1=parameter1, move_type=MOVES[MOVE]):
+                                return False, f'The automatons are not {self.pebbles}-pebble bisimilar'
+                        else:
+                            if new_player_1_node(parameter0=parameter0, parameter1=predecessor, move_type=MOVES[MOVE]):
+                                return False, f'The automatons are not {self.pebbles}-pebble bisimilar'
+
             last_added_attractor_nodes = new_attractor_nodes.copy()
             new_attractor_nodes = set()
 
