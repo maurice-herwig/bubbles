@@ -74,6 +74,13 @@ class MultiPebbleBisimulationGames(BisimulationGames):
             )
 
         def new_player_2_node(parameter0, parameter1, move_type):
+            """Process a candidate player-II predecessor node.
+
+            Player-II nodes are universal in the attractor construction: such
+            a node enters the player-I attractor only if all of its forward
+            successors are already in the attractor. Otherwise we remember the
+            still-missing successors in `seen_player2_nodes_not_in_attractor`.
+            """
             new_node = (parameter0, parameter1, move_type)
 
             if new_node in all_attractor_nodes:
@@ -100,10 +107,62 @@ class MultiPebbleBisimulationGames(BisimulationGames):
                 pass
 
             elif move_type in FiniteAutomata.alphabet:
+                # Forward rule for player-II's response after player I moved
+                # the single pebble under the recorded letter:
+                #
+                #   (q0, M1, a) -> (q0, M1', choice)
+                #
+                # where M1' is any non-empty subset of the a-successors of M1
+                # with size at most k, and symmetrically:
+                #
+                #   (M0, q1, a) -> (M0', q1, choice)
+                #
+                # We enumerate exactly these possible successor choice nodes
+                # and collect those that are not yet in the attractor.
                 all_successor_states = {succ for p in m for succ in
                                         self.automatons[1 - i].get_successors(s=p, a=move_type)}
 
-                # TODO alle Teilmengen von all_successor_states bestimmen die mindestens ein Element enthalten oder maximal self.pebbles elements enthalten bestimmten.
+                for r in range(1, min(len(all_successor_states), self.pebbles) + 1):
+                    for successor_set in combinations(all_successor_states, r):
+                        successor_set = frozenset(successor_set)
+
+                        if i == 0:
+                            successor_node = (q, successor_set, MOVES[CHOICE])
+                        else:
+                            successor_node = (successor_set, q, MOVES[CHOICE])
+
+                        if successor_node not in all_attractor_nodes:
+                            successors_not_in_attractor.add(successor_node)
+
+            # Universal predecessor rule:
+            #
+            #   A player-II node enters Attr_I(F) iff all of its successors are
+            #   already in Attr_I(F).
+            #
+            # Thus, if there is no remaining successor outside the attractor,
+            # this node itself must be added.
+            if not successors_not_in_attractor:
+                if check_initial(*new_node):
+                    return True
+
+                all_attractor_nodes.add(new_node)
+                new_attractor_nodes.add(new_node)
+                if self.propagate_new_attractor_nodes(
+                        nodes_to_process=[new_node],
+                        all_attractor_nodes=all_attractor_nodes,
+                        new_attractor_nodes=new_attractor_nodes,
+                        seen_player2_nodes_not_in_attractor=seen_player2_nodes_not_in_attractor,
+                        check_initial=check_initial,
+                ):
+                    return True
+
+            else:
+                # Otherwise we remember precisely which successors are still
+                # missing. As soon as the last one enters the attractor,
+                # propagation will add this player-II node automatically.
+                seen_player2_nodes_not_in_attractor.add_many(new_node, successors_not_in_attractor)
+
+            return False
 
         # TODO überprüfen, ob beim starten wie aktuell minimal ein pebble gesetzt sein muss oder auch 0 gehen.
         for final_state in self.finals[0]:
