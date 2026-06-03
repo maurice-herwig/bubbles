@@ -26,15 +26,13 @@ def _build_move_mapping() -> dict[str, int]:
     return move_mapping
 
 
-MOVES = _build_move_mapping()
-
-
 class MultiPebbleBisimulationGames(BisimulationGames):
 
     def __init__(self, automaton0: FiniteAutomata, automaton1: FiniteAutomata, pebbles: int):
         """Create the game instance for two NFA and k pebbles."""
         assert pebbles >= 1, "The number of pebbles must be at least 1."
         self.pebbles = pebbles
+        self.moves = _build_move_mapping()
         super().__init__(automaton0, automaton1)
 
     def set_pebbles(self, pebbles: int):
@@ -56,7 +54,7 @@ class MultiPebbleBisimulationGames(BisimulationGames):
             pebble-set in A1, choice). The symmetric orientation (M0, q1, m)
             is never the initial node.
             """
-            return move_type == MOVES[CHOICE] \
+            return move_type == self.moves[CHOICE] \
                 and isinstance(parameter0, int) \
                 and parameter0 in self.initials[0] \
                 and isinstance(parameter1, frozenset) \
@@ -124,7 +122,7 @@ class MultiPebbleBisimulationGames(BisimulationGames):
 
             successors_not_in_attractor = set()
 
-            if move_type == MOVES[COLL]:
+            if move_type == self.moves[COLL]:
                 # Forward rule for player-II's collapse response:
                 #
                 #   (q0, M1, coll) -> ({q0}, q1, move)
@@ -137,9 +135,9 @@ class MultiPebbleBisimulationGames(BisimulationGames):
                 # those that are not yet in the attractor.
                 for selected_state in pebble_set:
                     if moved_automaton_index == 0:
-                        successor_node = (frozenset({single_state}), selected_state, MOVES[MOVE])
+                        successor_node = (frozenset({single_state}), selected_state, self.moves[MOVE])
                     else:
-                        successor_node = (selected_state, frozenset({single_state}), MOVES[MOVE])
+                        successor_node = (selected_state, frozenset({single_state}), self.moves[MOVE])
 
                     if successor_node not in all_attractor_nodes:
                         successors_not_in_attractor.add(successor_node)
@@ -171,9 +169,9 @@ class MultiPebbleBisimulationGames(BisimulationGames):
                         successor_set = frozenset(successor_set)
 
                         if moved_automaton_index == 0:
-                            successor_node = (single_state, successor_set, MOVES[CHOICE])
+                            successor_node = (single_state, successor_set, self.moves[CHOICE])
                         else:
-                            successor_node = (successor_set, single_state, MOVES[CHOICE])
+                            successor_node = (successor_set, single_state, self.moves[CHOICE])
 
                         if successor_node not in all_attractor_nodes:
                             successors_not_in_attractor.add(successor_node)
@@ -241,7 +239,7 @@ class MultiPebbleBisimulationGames(BisimulationGames):
                 if not bad_node:
                     continue
 
-                for move_type in (MOVES[CHOICE], MOVES[MOVE]):
+                for move_type in (self.moves[CHOICE], self.moves[MOVE]):
                     new_node = (state, pebbles, move_type)
 
                     if check_initial(*new_node):
@@ -260,7 +258,7 @@ class MultiPebbleBisimulationGames(BisimulationGames):
                 if not bad_node:
                     continue
 
-                for move_type in (MOVES[CHOICE], MOVES[MOVE]):
+                for move_type in (self.moves[CHOICE], self.moves[MOVE]):
                     new_node = (pebbles, state, move_type)
 
                     if check_initial(*new_node):
@@ -294,7 +292,7 @@ class MultiPebbleBisimulationGames(BisimulationGames):
                     current_pebble_set = parameter0
                     current_automaton_index = 1
 
-                if move_type == MOVES[CHOICE]:
+                if move_type == self.moves[CHOICE]:
                     for letter in FiniteAutomata.alphabet:
                         # Reverse of the player-II response edge:
                         #
@@ -364,7 +362,7 @@ class MultiPebbleBisimulationGames(BisimulationGames):
                                 ):
                                     return False, f'The automatons are not {self.pebbles}-pebble bisimilar'
 
-                elif move_type == MOVES[MOVE]:
+                elif move_type == self.moves[MOVE]:
                     # Reverse of the player-I choice-to-move edge:
                     #
                     #   (q0, M1, choice) -> (q0, M1, move)
@@ -375,7 +373,7 @@ class MultiPebbleBisimulationGames(BisimulationGames):
                     #
                     # Since `choice` is owned by player I, this predecessor is
                     # existential and can be added directly to the attractor.
-                    if new_player_1_node(parameter0=parameter0, parameter1=parameter1, move_type=MOVES[CHOICE]):
+                    if new_player_1_node(parameter0=parameter0, parameter1=parameter1, move_type=self.moves[CHOICE]):
                         return False, f'The automatons are not {self.pebbles}-pebble bisimilar'
 
                     # Reverse of the player-II collapse edge:
@@ -405,7 +403,7 @@ class MultiPebbleBisimulationGames(BisimulationGames):
                                 if new_player_2_node(
                                         parameter0=new_M,
                                         parameter1=collapsed_state,
-                                        move_type=MOVES[COLL],
+                                        move_type=self.moves[COLL],
                                 ):
                                     return False, f'The automatons are not {self.pebbles}-pebble bisimilar'
                         else:
@@ -413,12 +411,12 @@ class MultiPebbleBisimulationGames(BisimulationGames):
                                 if new_player_2_node(
                                         parameter0=collapsed_state,
                                         parameter1=new_M,
-                                        move_type=MOVES[COLL],
+                                        move_type=self.moves[COLL],
                                 ):
                                     return False, f'The automatons are not {self.pebbles}-pebble bisimilar'
 
 
-                elif move_type == MOVES[COLL]:
+                elif move_type == self.moves[COLL]:
                     # Reverse of the player-I choice-to-collapse edge:
                     #
                     #   (q0, M1, choice) -> (q0, M1, coll)
@@ -429,7 +427,7 @@ class MultiPebbleBisimulationGames(BisimulationGames):
                     #
                     # Since `choice` is owned by player I, the predecessor is
                     # existential and can be added directly to the attractor.
-                    if new_player_1_node(parameter0=parameter0, parameter1=parameter1, move_type=MOVES[CHOICE]):
+                    if new_player_1_node(parameter0=parameter0, parameter1=parameter1, move_type=self.moves[CHOICE]):
                         return False, f'The automatons are not {self.pebbles}-pebble bisimilar'
 
                 elif move_type in FiniteAutomata.alphabet:
@@ -452,14 +450,14 @@ class MultiPebbleBisimulationGames(BisimulationGames):
                             if new_player_1_node(
                                     parameter0=predecessor,
                                     parameter1=current_pebble_set,
-                                    move_type=MOVES[MOVE],
+                                    move_type=self.moves[MOVE],
                             ):
                                 return False, f'The automatons are not {self.pebbles}-pebble bisimilar'
                         else:
                             if new_player_1_node(
                                     parameter0=current_pebble_set,
                                     parameter1=predecessor,
-                                    move_type=MOVES[MOVE],
+                                    move_type=self.moves[MOVE],
                             ):
                                 return False, f'The automatons are not {self.pebbles}-pebble bisimilar'
 

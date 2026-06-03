@@ -1,7 +1,8 @@
-from wofa import FiniteAutomata
+from wofa import FiniteAutomata, get_solution, get_submission
 from bubbles import BufferedBisimulationGames, MultiPebbleBisimulationGames
 
 if __name__ == '__main__':
+    """
     FiniteAutomata.set_alphabet({'a', 'b'})
 
     automaton0 = FiniteAutomata(initials={0},
@@ -16,6 +17,13 @@ if __name__ == '__main__':
 
     print(automaton0)
     print(automaton1)
+    """
+
+    automaton0 = get_solution(exercise='e')
+    automaton1 = get_submission('E', '69')
+
+    FiniteAutomata.set_alphabet(automaton0.calc_and_get_alphabet())
+
     print(f'Is automaton0 and automaton1 equivalent? {automaton0.equivalence_test(other=automaton1)}')
 
     multi_pebble_bisimulation_game = MultiPebbleBisimulationGames(automaton0=automaton0,
