@@ -43,32 +43,46 @@ class BisimulationGames(ABC):
         situation.
         """
         for i in range(2):
-            # Keep only transitions over the agreed alphabet of the game.
-            self.automatons[i].remove_non_alphabet_transitions()
+            automaton = self.automatons[i]
+
+            # Keep only transitions over the agreed alphabet of the game. This
+            # call can rewrite the automaton, so skip it when all transition
+            # labels are already part of the current alphabet.
+            if any(transition[1] not in FiniteAutomata.alphabet for transition in automaton.get_transitions()):
+                automaton.remove_non_alphabet_transitions()
 
             # States that cannot be reached from the start configuration never
-            # matter for the game graph.
-            self.automatons[i].remove_unreachable_states()
+            # matter for the game graph. Avoid calling the shrinking routine
+            # again once every state is already reachable.
+            if automaton.reachable() != set(range(automaton.get_number_of_states())):
+                automaton.remove_unreachable_states()
 
-            # If the automaton has multiple initials, we merge them into one equivalent start state.
-            self.automatons[i].normalize_initial_states()
+            # If the automaton has multiple initials, merge them into one
+            # equivalent start state. If it already has a single initial state,
+            # leave it untouched so repeated game construction is idempotent.
+            if len(automaton.get_initials()) != 1:
+                automaton.normalize_initial_states()
 
-            # Check whether the automaton is already total, i.e. whether every
-            # state has at least one outgoing transition for every letter.
-            total = True
-            for letter in FiniteAutomata.alphabet:
-                for state in range(self.automatons[i].get_number_of_states()):
-                    if not self.automatons[i].get_successors(s=state, a=letter):
-                        total = False
-                        break
-                if not total:
-                    break
+                # Normalizing multiple initial states can make old helper or
+                # start states unreachable. Remove them immediately so the
+                # prepared automaton is stable for later game constructions.
+                if automaton.reachable() != set(range(automaton.get_number_of_states())):
+                    automaton.remove_unreachable_states()
 
             # If some transition is missing, add a dead state to totalize the
             # automaton. Missing player-II responses are then represented by a
             # transition into this dead sink instead of by undefined behavior.
-            if not total:
-                self.automatons[i].add_dead_state()
+            if not self.__is_total(automaton):
+                automaton.add_dead_state()
+
+    @staticmethod
+    def __is_total(automaton: FiniteAutomata) -> bool:
+        """Return whether every state has a successor for every alphabet letter."""
+        return all(
+            automaton.get_successors(s=state, a=letter)
+            for letter in FiniteAutomata.alphabet
+            for state in range(automaton.get_number_of_states())
+        )
 
     @abstractmethod
     def solve(self):
