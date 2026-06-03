@@ -87,7 +87,7 @@ class BufferedBisimulationGames(BisimulationGames):
                     and move_type == MOVES[CHOICE]
             )
 
-        def propagate_new_attractor_nodes(nodes_to_process: list[tuple]) -> bool:
+        def __propagate_new_attractor_nodes(nodes_to_process: list[tuple]) -> bool:
             """Propagate the player-I attractor through stored player-II obligations.
 
             For player-II nodes we must realize the universal predecessor rule:
@@ -161,7 +161,7 @@ class BufferedBisimulationGames(BisimulationGames):
 
             all_attractor_nodes.add(new_node)
             new_attractor_nodes.add(new_node)
-            return propagate_new_attractor_nodes([new_node])
+            return __propagate_new_attractor_nodes([new_node])
 
         def new_player2_node(
                 node_state_pair: tuple, buffer_word: str, automaton_index: int, move_type: int):
@@ -316,7 +316,7 @@ class BufferedBisimulationGames(BisimulationGames):
 
                 all_attractor_nodes.add(new_node)
                 new_attractor_nodes.add(new_node)
-                if propagate_new_attractor_nodes([new_node]):
+                if __propagate_new_attractor_nodes([new_node]):
                     return True
             else:
                 # Otherwise we remember precisely which successors are still
