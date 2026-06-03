@@ -180,45 +180,60 @@ class MultiPebbleBisimulationGames(BisimulationGames):
 
             return False
 
-        # TODO überprüfen, ob beim starten wie aktuell minimal ein pebble gesetzt sein muss oder auch 0 gehen.
-        for final_state in self.finals[0]:
-            for non_finals_pebbles in [set(c) for r in range(1, min(len(self.non_finals[1]), self.pebbles) + 1)
-                                       for c in combinations(self.non_finals[1], r)]:
-                for i in range(2):
-                    new_node = (final_state, frozenset(non_finals_pebbles), i)
+        def pebble_sets_up_to_k(states: set[int]) -> list[frozenset[int]]:
+            return [
+                frozenset(c)
+                for r in range(1, min(len(states), self.pebbles) + 1)
+                for c in combinations(states, r)
+            ]
+
+        pebble_sets = {
+            index: pebble_sets_up_to_k(self.states[index])
+            for index in range(2)
+        }
+
+        # Initialize the attractor with the immediate winning positions for
+        # player I. According to the game definition, only choice and move
+        # nodes are final for player I. Such a node is immediately winning if
+        # the single state and the opposite pebble set disagree on finality:
+        #
+        #   q_i in F_i     and M_(1-i) contains no final state, or
+        #   q_i not in F_i and M_(1-i) contains at least one final state.
+        #
+        # The first loop handles nodes of the form (q0, M1, m), the second
+        # loop handles the symmetric nodes (M0, q1, m).
+        for state in self.states[0]:
+            for pebbles in pebble_sets[1]:
+                bad_node = (
+                                   state in self.finals[0] and not (pebbles & self.finals[1])
+                           ) or (
+                                   state in self.non_finals[0] and bool(pebbles & self.finals[1])
+                           )
+
+                if not bad_node:
+                    continue
+
+                for move_type in (MOVES[CHOICE], MOVES[MOVE]):
+                    new_node = (state, pebbles, move_type)
 
                     if check_initial(*new_node):
                         return False, f'The automatons are not {self.pebbles}-pebble bisimilar'
 
                     all_attractor_nodes.add(new_node)
 
-        for non_final_state in self.non_finals[0]:
-            for finals_pebbles in [set(c) for r in range(1, min(len(self.finals[1]), self.pebbles) + 1)
-                                   for c in combinations(self.finals[1], r)]:
-                for i in range(2):
-                    new_node = (non_final_state, frozenset(finals_pebbles), i)
+        for state in self.states[1]:
+            for pebbles in pebble_sets[0]:
+                bad_node = (
+                                   state in self.finals[1] and not (pebbles & self.finals[0])
+                           ) or (
+                                   state in self.non_finals[1] and bool(pebbles & self.finals[0])
+                           )
 
-                    if check_initial(*new_node):
-                        return False, f'The automatons are not {self.pebbles}-pebble bisimilar'
+                if not bad_node:
+                    continue
 
-                    all_attractor_nodes.add(new_node)
-
-        for final_state in self.finals[1]:
-            for non_finals_pebbles in [set(c) for r in range(1, min(len(self.non_finals[0]), self.pebbles) + 1)
-                                       for c in combinations(self.non_finals[0], r)]:
-                for i in range(2):
-                    new_node = (frozenset(non_finals_pebbles), final_state, i)
-
-                    if check_initial(*new_node):
-                        return False, f'The automatons are not {self.pebbles}-pebble bisimilar'
-
-                    all_attractor_nodes.add(new_node)
-
-        for non_final_state in self.non_finals[1]:
-            for finals_pebbles in [set(c) for r in range(1, min(len(self.finals[0]), self.pebbles) + 1)
-                                   for c in combinations(self.finals[0], r)]:
-                for i in range(2):
-                    new_node = (frozenset(finals_pebbles), non_final_state, i)
+                for move_type in (MOVES[CHOICE], MOVES[MOVE]):
+                    new_node = (pebbles, state, move_type)
 
                     if check_initial(*new_node):
                         return False, f'The automatons are not {self.pebbles}-pebble bisimilar'
