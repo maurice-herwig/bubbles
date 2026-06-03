@@ -56,7 +56,13 @@ class MultiPebbleBisimulationGames(BisimulationGames):
             all_attractor_nodes.add(new_player_1_node)
             new_attractor_nodes.add(new_player_1_node)
 
-            # TODO return propagate_new_attractor_nodes([new_node])
+            return self.propagate_new_attractor_nodes(
+                nodes_to_process=[new_player_1_node],
+                all_attractor_nodes=all_attractor_nodes,
+                new_attractor_nodes=new_attractor_nodes,
+                seen_player2_nodes_not_in_attractor=seen_player2_nodes_not_in_attractor,
+                check_initial=check_initial,
+            )
 
         # TODO überprüfen, ob beim starten wie aktuell minimal ein pebble gesetzt sein muss oder auch 0 gehen.
         for final_state in self.finals[0]:

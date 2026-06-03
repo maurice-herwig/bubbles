@@ -87,52 +87,6 @@ class BufferedBisimulationGames(BisimulationGames):
                     and move_type == MOVES[CHOICE]
             )
 
-        def __propagate_new_attractor_nodes(nodes_to_process: list[tuple]) -> bool:
-            """Propagate the player-I attractor through stored player-II obligations.
-
-            For player-II nodes we must realize the universal predecessor rule:
-
-                v in V_II enters Attr_I(F)
-                iff every successor of v already belongs to Attr_I(F).
-
-            The map `seen_player2_nodes_not_in_attractor` stores, for every
-            player-II node that is not yet in the attractor, the set of its
-            successors that are still outside the attractor.
-
-            Whenever a new node u enters the attractor, we remove u from all of
-            these pending successor sets. If a pending set becomes empty, then
-            the corresponding player-II node now satisfies the universal rule
-            and must itself enter the attractor. This can trigger another
-            cascade, so we process the nodes via a work list.
-
-            Args:
-                nodes_to_process: Newly added attractor nodes whose arrival may
-                    discharge pending player-II obligations.
-
-            Returns:
-                True iff the initial node is reached during propagation.
-            """
-            while nodes_to_process:
-                propagated_node = nodes_to_process.pop()
-
-                if not seen_player2_nodes_not_in_attractor.has_value(propagated_node):
-                    continue
-
-                for new_player2_attractor_node in seen_player2_nodes_not_in_attractor.remove_value_everywhere(
-                        propagated_node):
-
-                    if new_player2_attractor_node in all_attractor_nodes:
-                        continue
-
-                    if check_initial(*new_player2_attractor_node):
-                        return True
-
-                    all_attractor_nodes.add(new_player2_attractor_node)
-                    new_attractor_nodes.add(new_player2_attractor_node)
-                    nodes_to_process.append(new_player2_attractor_node)
-
-            return False
-
         def new_player1_node(
                 node_state_pair: tuple, buffer_word: str, automaton_index: int, move_type: int):
             """Add a player-I predecessor node to the attractor.
@@ -161,7 +115,13 @@ class BufferedBisimulationGames(BisimulationGames):
 
             all_attractor_nodes.add(new_node)
             new_attractor_nodes.add(new_node)
-            return __propagate_new_attractor_nodes([new_node])
+            return self.propagate_new_attractor_nodes(
+                nodes_to_process=[new_node],
+                all_attractor_nodes=all_attractor_nodes,
+                new_attractor_nodes=new_attractor_nodes,
+                seen_player2_nodes_not_in_attractor=seen_player2_nodes_not_in_attractor,
+                check_initial=check_initial,
+            )
 
         def new_player2_node(
                 node_state_pair: tuple, buffer_word: str, automaton_index: int, move_type: int):
@@ -316,7 +276,13 @@ class BufferedBisimulationGames(BisimulationGames):
 
                 all_attractor_nodes.add(new_node)
                 new_attractor_nodes.add(new_node)
-                if __propagate_new_attractor_nodes([new_node]):
+                if self.propagate_new_attractor_nodes(
+                        nodes_to_process=[new_node],
+                        all_attractor_nodes=all_attractor_nodes,
+                        new_attractor_nodes=new_attractor_nodes,
+                        seen_player2_nodes_not_in_attractor=seen_player2_nodes_not_in_attractor,
+                        check_initial=check_initial,
+                ):
                     return True
             else:
                 # Otherwise we remember precisely which successors are still
