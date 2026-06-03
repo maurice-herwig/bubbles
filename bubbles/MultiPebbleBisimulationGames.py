@@ -103,8 +103,24 @@ class MultiPebbleBisimulationGames(BisimulationGames):
             successors_not_in_attractor = set()
 
             if move_type == MOVES[COLL]:
-                # TODO
-                pass
+                # Forward rule for player-II's collapse response:
+                #
+                #   (q0, M1, coll) -> ({q0}, q1, move)
+                #
+                # for any q1 in M1, and symmetrically:
+                #
+                #   (M0, q1, coll) -> (q0, {q1}, move)
+                #
+                # We enumerate every possible collapsed successor and collect
+                # those that are not yet in the attractor.
+                for selected_state in m:
+                    if i == 0:
+                        successor_node = (frozenset({q}), selected_state, MOVES[MOVE])
+                    else:
+                        successor_node = (selected_state, frozenset({q}), MOVES[MOVE])
+
+                    if successor_node not in all_attractor_nodes:
+                        successors_not_in_attractor.add(successor_node)
 
             elif move_type in FiniteAutomata.alphabet:
                 # Forward rule for player-II's response after player I moved
