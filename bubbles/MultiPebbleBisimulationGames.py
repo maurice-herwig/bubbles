@@ -45,6 +45,15 @@ class MultiPebbleBisimulationGames(BisimulationGames):
                 and (next(iter(parameter1)) in self.initials[1])
 
         def new_player_1_node(parameter0, parameter1, move_type):
+            """Add a player-I predecessor node to the attractor.
+
+            In the attractor computation, player-I nodes are existential:
+            a player-I node enters the attractor as soon as one of its
+            successors is already in the attractor. This helper adds such a
+            predecessor, checks whether it is the initial node, and then
+            propagates the newly added attractor node through pending player-II
+            obligations.
+            """
             new_player_1_node = (parameter0, parameter1, move_type)
 
             if new_player_1_node in all_attractor_nodes:
@@ -143,6 +152,16 @@ class MultiPebbleBisimulationGames(BisimulationGames):
                     pass
 
                 elif move_type == MOVES[COLL]:
+                    # Reverse of the player-I choice-to-collapse edge:
+                    #
+                    #   (q0, M1, choice) -> (q0, M1, coll)
+                    #
+                    # and symmetrically:
+                    #
+                    #   (M0, q1, choice) -> (M0, q1, coll)
+                    #
+                    # Since `choice` is owned by player I, the predecessor is
+                    # existential and can be added directly to the attractor.
                     if new_player_1_node(parameter0=parameter0, parameter1=parameter1, move_type=MOVES[CHOICE]):
                         return False, f'The automatons are not {self.pebbles}-pebble bisimilar'
 
