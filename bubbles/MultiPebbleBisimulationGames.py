@@ -73,19 +73,19 @@ class MultiPebbleBisimulationGames(BisimulationGames):
             propagates the newly added attractor node through pending player-II
             obligations.
             """
-            new_player_1_node = (parameter0, parameter1, move_type)
+            candidate_node = (parameter0, parameter1, move_type)
 
-            if new_player_1_node in all_attractor_nodes:
+            if candidate_node in all_attractor_nodes:
                 return False
 
-            if check_initial(*new_player_1_node):
+            if check_initial(*candidate_node):
                 return True
 
-            all_attractor_nodes.add(new_player_1_node)
-            new_attractor_nodes.add(new_player_1_node)
+            all_attractor_nodes.add(candidate_node)
+            new_attractor_nodes.add(candidate_node)
 
             return self.propagate_new_attractor_nodes(
-                nodes_to_process=[new_player_1_node],
+                nodes_to_process=[candidate_node],
                 all_attractor_nodes=all_attractor_nodes,
                 new_attractor_nodes=new_attractor_nodes,
                 seen_player2_nodes_not_in_attractor=seen_player2_nodes_not_in_attractor,
@@ -99,6 +99,9 @@ class MultiPebbleBisimulationGames(BisimulationGames):
             a node enters the player-I attractor only if all of its forward
             successors are already in the attractor. Otherwise we remember the
             still-missing successors in `seen_player2_nodes_not_in_attractor`.
+            The local orientation variables are named explicitly to avoid
+            confusing them with the similarly shaped nodes processed in the
+            main fixpoint loop.
             """
             new_node = (parameter0, parameter1, move_type)
 
@@ -111,13 +114,13 @@ class MultiPebbleBisimulationGames(BisimulationGames):
                 return False
 
             if isinstance(parameter0, int):
-                q = parameter0
-                m = parameter1
-                i = 0
+                single_state = parameter0
+                pebble_set = parameter1
+                moved_automaton_index = 0
             else:
-                q = parameter1
-                m = parameter0
-                i = 1
+                single_state = parameter1
+                pebble_set = parameter0
+                moved_automaton_index = 1
 
             successors_not_in_attractor = set()
 
@@ -132,11 +135,11 @@ class MultiPebbleBisimulationGames(BisimulationGames):
                 #
                 # We enumerate every possible collapsed successor and collect
                 # those that are not yet in the attractor.
-                for selected_state in m:
-                    if i == 0:
-                        successor_node = (frozenset({q}), selected_state, MOVES[MOVE])
+                for selected_state in pebble_set:
+                    if moved_automaton_index == 0:
+                        successor_node = (frozenset({single_state}), selected_state, MOVES[MOVE])
                     else:
-                        successor_node = (selected_state, frozenset({q}), MOVES[MOVE])
+                        successor_node = (selected_state, frozenset({single_state}), MOVES[MOVE])
 
                     if successor_node not in all_attractor_nodes:
                         successors_not_in_attractor.add(successor_node)
@@ -154,17 +157,23 @@ class MultiPebbleBisimulationGames(BisimulationGames):
                 #
                 # We enumerate exactly these possible successor choice nodes
                 # and collect those that are not yet in the attractor.
-                all_successor_states = {succ for p in m for succ in
-                                        self.automatons[1 - i].get_successors(s=p, a=move_type)}
+                all_successor_states = {
+                    successor_state
+                    for pebble_state in pebble_set
+                    for successor_state in self.automatons[1 - moved_automaton_index].get_successors(
+                        s=pebble_state,
+                        a=move_type,
+                    )
+                }
 
                 for r in range(1, min(len(all_successor_states), self.pebbles) + 1):
                     for successor_set in combinations(all_successor_states, r):
                         successor_set = frozenset(successor_set)
 
-                        if i == 0:
-                            successor_node = (q, successor_set, MOVES[CHOICE])
+                        if moved_automaton_index == 0:
+                            successor_node = (single_state, successor_set, MOVES[CHOICE])
                         else:
-                            successor_node = (successor_set, q, MOVES[CHOICE])
+                            successor_node = (successor_set, single_state, MOVES[CHOICE])
 
                         if successor_node not in all_attractor_nodes:
                             successors_not_in_attractor.add(successor_node)
@@ -277,13 +286,13 @@ class MultiPebbleBisimulationGames(BisimulationGames):
 
             for parameter0, parameter1, move_type in last_added_attractor_nodes:
                 if isinstance(parameter0, int):
-                    q = parameter0
-                    m = parameter1
-                    i = 0
+                    current_single_state = parameter0
+                    current_pebble_set = parameter1
+                    current_automaton_index = 0
                 else:
-                    q = parameter1
-                    m = parameter0
-                    i = 1
+                    current_single_state = parameter1
+                    current_pebble_set = parameter0
+                    current_automaton_index = 1
 
                 if move_type == MOVES[CHOICE]:
                     for letter in FiniteAutomata.alphabet:
@@ -300,8 +309,11 @@ class MultiPebbleBisimulationGames(BisimulationGames):
                         # therefore reconstruct all old pebble sets that could
                         # cover M under the recorded letter.
                         predecessor_map = {
-                            p: self.automatons[1 - i].get_predecessors(s=p, a=letter)
-                            for p in m
+                            pebble_state: self.automatons[1 - current_automaton_index].get_predecessors(
+                                s=pebble_state,
+                                a=letter,
+                            )
+                            for pebble_state in current_pebble_set
                         }
 
                         # First build minimal predecessor sets by choosing one
@@ -327,7 +339,7 @@ class MultiPebbleBisimulationGames(BisimulationGames):
                         extended_predecessor_sets = set(predecessor_sets)
 
                         for predecessor_set in predecessor_sets:
-                            missing_states = self.states[1 - i] - predecessor_set
+                            missing_states = self.states[1 - current_automaton_index] - predecessor_set
                             remaining_capacity = self.pebbles - len(predecessor_set)
 
                             for r in range(1, remaining_capacity + 1):
@@ -337,11 +349,19 @@ class MultiPebbleBisimulationGames(BisimulationGames):
                                     )
 
                         for predecessor_set in extended_predecessor_sets:
-                            if i == 0:
-                                if new_player_2_node(parameter0=q, parameter1=predecessor_set, move_type=letter):
+                            if current_automaton_index == 0:
+                                if new_player_2_node(
+                                        parameter0=current_single_state,
+                                        parameter1=predecessor_set,
+                                        move_type=letter,
+                                ):
                                     return False, f'The automatons are not {self.pebbles}-pebble bisimilar'
                             else:
-                                if new_player_2_node(parameter0=predecessor_set, parameter1=q, move_type=letter):
+                                if new_player_2_node(
+                                        parameter0=predecessor_set,
+                                        parameter1=current_single_state,
+                                        move_type=letter,
+                                ):
                                     return False, f'The automatons are not {self.pebbles}-pebble bisimilar'
 
                 elif move_type == MOVES[MOVE]:
@@ -369,24 +389,32 @@ class MultiPebbleBisimulationGames(BisimulationGames):
                     # Therefore this reverse case only applies if the set-side
                     # of the current move node is a singleton. We then rebuild
                     # every possible collapsed predecessor set containing the
-                    # current single state `q`, with size at most k.
-                    if len(m) == 1:
-                        q_in_M = next(iter(m))
+                    # current single state, with size at most k.
+                    if len(current_pebble_set) == 1:
+                        collapsed_state = next(iter(current_pebble_set))
 
-                        not_q_states = set(self.states[i]) - {q}
+                        other_states = set(self.states[current_automaton_index]) - {current_single_state}
 
                         new_Ms = []
                         for r in range(self.pebbles):
-                            for c in combinations(not_q_states, r):
-                                new_Ms.append(frozenset({q, *c}))
+                            for c in combinations(other_states, r):
+                                new_Ms.append(frozenset({current_single_state, *c}))
 
-                        if i == 0:
+                        if current_automaton_index == 0:
                             for new_M in new_Ms:
-                                if new_player_2_node(parameter0=new_M, parameter1=q_in_M, move_type=MOVES[COLL]):
+                                if new_player_2_node(
+                                        parameter0=new_M,
+                                        parameter1=collapsed_state,
+                                        move_type=MOVES[COLL],
+                                ):
                                     return False, f'The automatons are not {self.pebbles}-pebble bisimilar'
                         else:
                             for new_M in new_Ms:
-                                if new_player_2_node(parameter0=q_in_M, parameter1=new_M, move_type=MOVES[COLL]):
+                                if new_player_2_node(
+                                        parameter0=collapsed_state,
+                                        parameter1=new_M,
+                                        move_type=MOVES[COLL],
+                                ):
                                     return False, f'The automatons are not {self.pebbles}-pebble bisimilar'
 
 
@@ -416,12 +444,23 @@ class MultiPebbleBisimulationGames(BisimulationGames):
                     #
                     # We therefore enumerate all predecessors of the moved
                     # single pebble under the recorded letter `move_type`.
-                    for predecessor in self.automatons[i].get_predecessors(s=q, a=move_type):
-                        if i == 0:
-                            if new_player_1_node(parameter0=predecessor, parameter1=m, move_type=MOVES[MOVE]):
+                    for predecessor in self.automatons[current_automaton_index].get_predecessors(
+                            s=current_single_state,
+                            a=move_type,
+                    ):
+                        if current_automaton_index == 0:
+                            if new_player_1_node(
+                                    parameter0=predecessor,
+                                    parameter1=current_pebble_set,
+                                    move_type=MOVES[MOVE],
+                            ):
                                 return False, f'The automatons are not {self.pebbles}-pebble bisimilar'
                         else:
-                            if new_player_1_node(parameter0=m, parameter1=predecessor, move_type=MOVES[MOVE]):
+                            if new_player_1_node(
+                                    parameter0=current_pebble_set,
+                                    parameter1=predecessor,
+                                    move_type=MOVES[MOVE],
+                            ):
                                 return False, f'The automatons are not {self.pebbles}-pebble bisimilar'
 
             last_added_attractor_nodes = new_attractor_nodes.copy()
