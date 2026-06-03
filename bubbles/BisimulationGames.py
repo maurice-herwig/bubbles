@@ -13,11 +13,12 @@ class BisimulationGames(ABC):
         self.__prepare_automatons()
 
         # Precompute the sets of final, non-final, and initial states for both automata to speed up the game solving.
+        self.states = {index: set(range(self.automatons[index].get_number_of_states())) for index in range(2)}
         self.finals = {index: self.automatons[index].get_finals() for index in range(2)}
         self.non_finals = {
             index: {
                 state
-                for state in range(self.automatons[index].get_number_of_states())
+                for state in self.states[index]
                 if state not in self.finals[index]
             }
             for index in range(2)

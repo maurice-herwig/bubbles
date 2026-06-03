@@ -73,6 +73,10 @@ class MultiPebbleBisimulationGames(BisimulationGames):
                 check_initial=check_initial,
             )
 
+        def new_player_2_node(parameter0, parameter1, move_type):
+            # TODO
+            pass
+
         # TODO überprüfen, ob beim starten wie aktuell minimal ein pebble gesetzt sein muss oder auch 0 gehen.
         for final_state in self.finals[0]:
             for non_finals_pebbles in [set(c) for r in range(1, min(len(self.non_finals[1]), self.pebbles) + 1)
@@ -161,8 +165,37 @@ class MultiPebbleBisimulationGames(BisimulationGames):
                     if new_player_1_node(parameter0=parameter0, parameter1=parameter1, move_type=MOVES[CHOICE]):
                         return False, f'The automatons are not {self.pebbles}-pebble bisimilar'
 
-                    # Fall Player 2 hat zu move gespielt:
-                    # TODO
+                    # Reverse of the player-II collapse edge:
+                    #
+                    #   (q0, M1, coll) -> ({q0}, q1, move)
+                    #
+                    # for some q1 in M1, and symmetrically:
+                    #
+                    #   (M0, q1, coll) -> (q0, {q1}, move)
+                    #
+                    # Therefore this reverse case only applies if the set-side
+                    # of the current move node is a singleton. We then rebuild
+                    # every possible collapsed predecessor set containing the
+                    # current single state `q`, with size at most k.
+                    if len(M) == 1:
+                        q_in_M = next(iter(M))
+
+                        not_q_states = set(self.states[i]) - {q}
+
+                        new_Ms = []
+                        for r in range(self.pebbles):
+                            for c in combinations(not_q_states, r):
+                                new_Ms.append(frozenset({q, *c}))
+
+                        if i == 0:
+                            for new_M in new_Ms:
+                                if new_player_2_node(parameter0=new_M, parameter1=q_in_M, move_type=MOVES[COLL]):
+                                    return False, f'The automatons are not {self.pebbles}-pebble bisimilar'
+                        else:
+                            for new_M in new_Ms:
+                                if new_player_2_node(parameter0=q_in_M, parameter1=new_M, move_type=MOVES[COLL]):
+                                    return False, f'The automatons are not {self.pebbles}-pebble bisimilar'
+
 
                 elif move_type == MOVES[COLL]:
                     # Reverse of the player-I choice-to-collapse edge:
