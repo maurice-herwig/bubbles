@@ -1,6 +1,10 @@
 from collections import defaultdict
 from dataclasses import dataclass
+from pathlib import Path
 from time import perf_counter
+
+from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
+from matplotlib.figure import Figure
 
 from wofa import FiniteAutomata, SubmissionIterator, get_solution
 
@@ -8,6 +12,7 @@ from bubbles import BufferedBisimulationGames, MultiPebbleBisimulationGames
 
 MAX_BUFFER_PEBBLE_SIZE = 2
 TASKS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S']
+PLOT_DIR = Path(__file__).resolve().parent / 'plots'
 
 
 @dataclass
@@ -74,17 +79,24 @@ def format_seconds(value: float | None) -> str:
     return f'{value:.6f}s' if value is not None else 'n/a'
 
 
+def format_number(value: float | None, digits: int = 6) -> str:
+    return f'{value:.{digits}f}' if value is not None else 'n/a'
+
+
 def print_task_summary(task: str, summary: dict):
     print()
     print(f'Task {task}')
     print('------')
     print(f'Total submissions: {summary["total_submissions"]}')
     print(f'Non-parseable submissions: {summary["non_parseable"]}')
+    print(f'Skipped deterministic pairs: {summary["skipped_deterministic_pairs"]}')
     print(f'Measured pairs: {summary["measured_pairs"]}')
     print(f'Equivalent pairs: {summary["equivalent_pairs"]}')
-    print(f'Average pair blow-up max: {average(summary["pair_blowup_max"]):.6f}')
+    print(f'Average pair blow-up max: {format_number(average(summary["pair_blowup_max"]))}')
     print(f'Max pair blow-up max: {max(summary["pair_blowup_max"], default=0.0):.6f}')
-    print(f'Average pair DFA states sum: {average(summary["pair_dfa_states_sum"]):.2f}')
+    print(f'Average product blow-up: {format_number(average(summary["product_blowup"]))}')
+    print(f'Max product blow-up: {max(summary["product_blowup"], default=0.0):.6f}')
+    print(f'Average pair DFA states sum: {format_number(average(summary["pair_dfa_states_sum"]), 2)}')
     print(f'Average equivalence-test runtime: {format_seconds(average(summary["eq_runtimes"]))}')
 
     for k in range(1, MAX_BUFFER_PEBBLE_SIZE + 1):
@@ -154,14 +166,127 @@ def print_bucket_summary(records: list[dict]):
             )
 
 
+def plot_runtime_ratios_for_k(records: list[dict], x_key: str, x_label: str, k: int, output_path: Path):
+    plot_records = [
+        record
+        for record in records
+        if record['eq_runtime'] > 0
+        and record['buffer_runtimes'][k] > 0
+        and record['pebble_runtimes'][k] > 0
+        and record[x_key] > 0
+    ]
+    if not plot_records:
+        print(f'Skipping {output_path.name}: no plottable records')
+        return
+
+    fig = Figure(figsize=(11, 7))
+    FigureCanvas(fig)
+    ax = fig.subplots()
+
+    groups = [
+        {
+            'label': f'pebble equivalent k={k}',
+            'algorithm': 'pebble',
+            'equivalent': True,
+            'color': '#2ca02c',
+            'marker': '^',
+        },
+        {
+            'label': f'pebble not equivalent k={k}',
+            'algorithm': 'pebble',
+            'equivalent': False,
+            'color': '#d62728',
+            'marker': 'v',
+        },
+        {
+            'label': f'buffer equivalent k={k}',
+            'algorithm': 'buffer',
+            'equivalent': True,
+            'color': '#1f77b4',
+            'marker': 's',
+        },
+        {
+            'label': f'buffer not equivalent k={k}',
+            'algorithm': 'buffer',
+            'equivalent': False,
+            'color': '#ff7f0e',
+            'marker': 'o',
+        },
+    ]
+
+    for group in groups:
+        group_records = [
+            record
+            for record in plot_records
+            if record['equivalent'] == group['equivalent']
+        ]
+        if not group_records:
+            continue
+
+        runtime_key = f'{group["algorithm"]}_runtimes'
+        ax.scatter(
+            [record[x_key] for record in group_records],
+            [
+                record[runtime_key][k] / record['eq_runtime']
+                for record in group_records
+            ],
+            marker=group['marker'],
+            color=group['color'],
+            alpha=0.7,
+            edgecolors='none',
+            label=group['label'],
+        )
+
+    ax.axhline(1.0, color='#444444', linewidth=1, linestyle='--', label='equivalence test')
+    ax.set_yscale('log')
+    ax.set_xscale('log')
+    ax.set_xlabel(x_label)
+    ax.set_ylabel('algorithm runtime / equivalence-test runtime')
+    ax.set_title(f'Bisimulation runtimes by {x_label}, k={k}')
+    ax.grid(True, alpha=0.25)
+    ax.legend()
+    fig.tight_layout()
+    fig.savefig(output_path, dpi=160)
+    print(f'Wrote {output_path}')
+
+
+def write_plots(records: list[dict]):
+    PLOT_DIR.mkdir(parents=True, exist_ok=True)
+
+    for k in range(1, MAX_BUFFER_PEBBLE_SIZE + 1):
+        plot_runtime_ratios_for_k(
+            records=records,
+            x_key='pair_blowup_max',
+            x_label='pair_blowup_max',
+            k=k,
+            output_path=PLOT_DIR / f'runtime_ratio_by_pair_blowup_max_k{k}.png',
+        )
+        plot_runtime_ratios_for_k(
+            records=records,
+            x_key='pair_blowup_sum',
+            x_label='pair_blowup_sum',
+            k=k,
+            output_path=PLOT_DIR / f'runtime_ratio_by_pair_blowup_sum_k{k}.png',
+        )
+        plot_runtime_ratios_for_k(
+            records=records,
+            x_key='product_blowup',
+            x_label='product_blowup',
+            k=k,
+            output_path=PLOT_DIR / f'runtime_ratio_by_product_blowup_k{k}.png',
+        )
+
+
 def new_summary() -> dict:
     return {
         'total_submissions': 0,
         'non_parseable': 0,
+        'skipped_deterministic_pairs': 0,
         'measured_pairs': 0,
         'equivalent_pairs': 0,
         'pair_blowup_max': [],
         'pair_blowup_sum': [],
+        'product_blowup': [],
         'pair_dfa_states_sum': [],
         'eq_runtimes': [],
         'buffer_runtimes': defaultdict(list),
@@ -173,10 +298,22 @@ def new_summary() -> dict:
 
 
 def add_summary(target: dict, source: dict):
-    for key in ('total_submissions', 'non_parseable', 'measured_pairs', 'equivalent_pairs'):
+    for key in (
+            'total_submissions',
+            'non_parseable',
+            'skipped_deterministic_pairs',
+            'measured_pairs',
+            'equivalent_pairs',
+    ):
         target[key] += source[key]
 
-    for key in ('pair_blowup_max', 'pair_blowup_sum', 'pair_dfa_states_sum', 'eq_runtimes'):
+    for key in (
+            'pair_blowup_max',
+            'pair_blowup_sum',
+            'product_blowup',
+            'pair_dfa_states_sum',
+            'eq_runtimes',
+    ):
         target[key].extend(source[key])
 
     target['records'].extend(source['records'])
@@ -212,10 +349,17 @@ def run_task(task: str) -> dict:
         automaton0 = prepared_automatons[0]
         automaton1 = prepared_automatons[1]
 
+        is_automaton0_dfa = automaton0.is_deterministic()
+        is_automaton1_dfa = automaton1.is_deterministic()
+        if is_automaton0_dfa and is_automaton1_dfa:
+            summary['skipped_deterministic_pairs'] += 1
+            continue
+
         blowup0 = calc_blowup_stats(automaton0)
         blowup1 = calc_blowup_stats(automaton1)
         pair_blowup_max = max(blowup0.ratio, blowup1.ratio)
         pair_blowup_sum = blowup0.ratio + blowup1.ratio
+        product_blowup = blowup0.ratio * blowup1.ratio
         pair_dfa_states_sum = blowup0.dfa_states + blowup1.dfa_states
 
         start_time = perf_counter()
@@ -226,6 +370,7 @@ def run_task(task: str) -> dict:
         summary['equivalent_pairs'] += int(equivalent)
         summary['pair_blowup_max'].append(pair_blowup_max)
         summary['pair_blowup_sum'].append(pair_blowup_sum)
+        summary['product_blowup'].append(product_blowup)
         summary['pair_dfa_states_sum'].append(pair_dfa_states_sum)
         summary['eq_runtimes'].append(eq_runtime)
 
@@ -233,6 +378,8 @@ def run_task(task: str) -> dict:
             'task': task,
             'submission_index': iterator.index,
             'equivalent': equivalent,
+            'is_automaton0_dfa': is_automaton0_dfa,
+            'is_automaton1_dfa': is_automaton1_dfa,
             'nfa_states_0': blowup0.nfa_states,
             'nfa_states_1': blowup1.nfa_states,
             'dfa_states_0': blowup0.dfa_states,
@@ -241,6 +388,7 @@ def run_task(task: str) -> dict:
             'blowup_1': blowup1.ratio,
             'pair_blowup_max': pair_blowup_max,
             'pair_blowup_sum': pair_blowup_sum,
+            'product_blowup': product_blowup,
             'pair_dfa_states_sum': pair_dfa_states_sum,
             'eq_runtime': eq_runtime,
             'buffer_runtimes': {},
@@ -302,12 +450,15 @@ if __name__ == '__main__':
     print(f'Tasks: {", ".join(TASKS)}')
     print(f'Total submissions: {global_summary["total_submissions"]}')
     print(f'Non-parseable submissions: {global_summary["non_parseable"]}')
+    print(f'Skipped deterministic pairs: {global_summary["skipped_deterministic_pairs"]}')
     print(f'Measured pairs: {global_summary["measured_pairs"]}')
     print(f'Equivalent pairs: {global_summary["equivalent_pairs"]}')
-    print(f'Average pair blow-up max: {average(global_summary["pair_blowup_max"]):.6f}')
+    print(f'Average pair blow-up max: {format_number(average(global_summary["pair_blowup_max"]))}')
     print(f'Max pair blow-up max: {max(global_summary["pair_blowup_max"], default=0.0):.6f}')
-    print(f'Average pair blow-up sum: {average(global_summary["pair_blowup_sum"]):.6f}')
-    print(f'Average pair DFA states sum: {average(global_summary["pair_dfa_states_sum"]):.2f}')
+    print(f'Average pair blow-up sum: {format_number(average(global_summary["pair_blowup_sum"]))}')
+    print(f'Average product blow-up: {format_number(average(global_summary["product_blowup"]))}')
+    print(f'Max product blow-up: {max(global_summary["product_blowup"], default=0.0):.6f}')
+    print(f'Average pair DFA states sum: {format_number(average(global_summary["pair_dfa_states_sum"]), 2)}')
     print(f'Average equivalence-test runtime: {format_seconds(average(global_summary["eq_runtimes"]))}')
 
     for k in range(1, MAX_BUFFER_PEBBLE_SIZE + 1):
@@ -320,3 +471,4 @@ if __name__ == '__main__':
         )
 
     print_bucket_summary(global_summary['records'])
+    write_plots(global_summary['records'])
