@@ -11,7 +11,7 @@ TASKS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', '
 if __name__ == '__main__':
     # Select the benchmark task whose reference solution and submissions are
     # loaded below.
-    task = TASKS[18]  # 5, 11, 12, 18
+    task = TASKS[12]  # 5, 11, 12, 18
     print(f'---------{task}------------')
 
     # Load the reference solution and use its alphabet as the common alphabet
