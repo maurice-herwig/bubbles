@@ -4,14 +4,14 @@ from time import perf_counter
 from wofa import get_solution, FiniteAutomata, SubmissionIterator
 from bubbles import BufferedBisimulationGames, MultiPebbleBisimulationGames
 
-MAX_BUFFER_PEBBLE_SIZE = 3
+MAX_BUFFER_PEBBLE_SIZE = 2
 
-TASKS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M']
+TASKS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S']
 
 if __name__ == '__main__':
     # Select the benchmark task whose reference solution and submissions are
     # loaded below.
-    task = TASKS[12]  # 5, 11, 12
+    task = TASKS[18]  # 5, 11, 12, 18
     print(f'---------{task}------------')
 
     # Load the reference solution and use its alphabet as the common alphabet
