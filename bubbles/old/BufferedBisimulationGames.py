@@ -1,7 +1,7 @@
 from wofa import FiniteAutomata
 
 from .BisimulationGames import BisimulationGames
-from .TwoWaySetMap import TwoWaySetMap
+from ..games.TwoWaySetMap import TwoWaySetMap
 
 CHOICE = "CHOICE"
 MOVE = "MOVE"

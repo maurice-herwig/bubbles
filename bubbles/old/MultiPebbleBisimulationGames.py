@@ -2,7 +2,7 @@ from wofa import FiniteAutomata
 from itertools import combinations, product
 
 from .BisimulationGames import BisimulationGames
-from .TwoWaySetMap import TwoWaySetMap
+from ..games.TwoWaySetMap import TwoWaySetMap
 
 CHOICE = "CHOICE"
 MOVE = "MOVE"
