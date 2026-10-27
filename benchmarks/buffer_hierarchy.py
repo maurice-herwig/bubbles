@@ -7,7 +7,7 @@ For every WoFa submission this benchmark checks the implication
 for all tested buffer sizes. For language-equivalent pairs it records the
 smallest tested buffer size for which the revised buffered bisimulation holds.
 Because no finite completeness bound is assumed, the search is limited by the
-    explicit ``--max-k`` argument.
+explicit ``--max-k`` argument.
 """
 
 import argparse
@@ -18,7 +18,6 @@ from time import perf_counter
 from wofa import FiniteAutomata, SubmissionIterator, get_solution
 
 from bubbles import BufferedBisimulationGames
-from bubbles.util import are_isomorphic
 
 
 TASKS = tuple('ABCDEFGHIJKLMNOPQRS')
@@ -32,17 +31,20 @@ class TaskSummary:
     total_submissions: int = 0
     non_parseable: int = 0
     language_equivalent: int = 0
-    isomorphic_duplicates: int = 0
+    non_equivalent_without_k1_match: int = 0
     first_buffer_counts: Counter = None
     equivalent_without_match: int = 0
     implication_violations: int = 0
     tested_pairs: int = 0
     total_equivalence_runtime: float = 0.0
     total_buffer_runtime: float = 0.0
+    buffer_runtimes: dict[int, list[float]] = None
 
     def __post_init__(self):
         if self.first_buffer_counts is None:
             self.first_buffer_counts = Counter()
+        if self.buffer_runtimes is None:
+            self.buffer_runtimes = {}
 
 
 def clone_automaton(automaton: FiniteAutomata) -> FiniteAutomata:
@@ -60,7 +62,6 @@ def run_task(task: str, max_k: int) -> TaskSummary:
     solution = get_solution(exercise=task)
     FiniteAutomata.set_alphabet(solution.calc_and_get_alphabet())
     iterator = SubmissionIterator(task=task)
-    representatives = []
 
     for submission in iterator:
         summary.total_submissions += 1
@@ -80,16 +81,6 @@ def run_task(task: str, max_k: int) -> TaskSummary:
         )
         automaton0, automaton1 = game.get_automatons().values()
 
-        if any(
-                are_isomorphic(automaton1, representative)
-                for representative in representatives
-        ):
-            summary.isomorphic_duplicates += 1
-            print(f'RESULT {task}{iterator.index}: isomorphic-duplicate')
-            continue
-
-        representatives.append(clone_automaton(automaton1))
-
         start_time = perf_counter()
         equivalent = automaton0.equivalence_test(other=automaton1)
         summary.total_equivalence_runtime += perf_counter() - start_time
@@ -104,30 +95,42 @@ def run_task(task: str, max_k: int) -> TaskSummary:
             game.set_buffer_size(buffer_size=k)
             start_time = perf_counter()
             buffer_similar, _ = game.solve()
-            summary.total_buffer_runtime += perf_counter() - start_time
+            buffer_runtime = perf_counter() - start_time
+            summary.total_buffer_runtime += buffer_runtime
+            summary.buffer_runtimes.setdefault(k, []).append(buffer_runtime)
 
             if buffer_similar:
                 first_matching_k = k
                 break
 
         if first_matching_k is None:
-            summary.first_buffer_counts['not-found'] += 1
             if equivalent:
+                summary.first_buffer_counts['not-found'] += 1
                 summary.equivalent_without_match += 1
+            else:
+                summary.non_equivalent_without_k1_match += 1
         else:
-            summary.first_buffer_counts[first_matching_k] += 1
-            if not equivalent:
+            if equivalent:
+                summary.first_buffer_counts[first_matching_k] += 1
+            else:
                 summary.implication_violations += 1
                 print(
                     f'WARNING {task}{iterator.index}: '
                     f'{first_matching_k}-buffer bisimilar but not language equivalent'
                 )
 
-        print(
-            f'RESULT {task}{iterator.index}: '
-            f'language-equivalent={equivalent}, '
-            f'first-buffer-k={first_matching_k or "not-found"}'
-        )
+        if equivalent:
+            print(
+                f'RESULT {task}{iterator.index}: '
+                f'language-equivalent=True, '
+                f'first-buffer-k={first_matching_k or "not-found"}'
+            )
+        else:
+            print(
+                f'RESULT {task}{iterator.index}: '
+                f'language-equivalent=False, '
+                f'1-buffered={bool(first_matching_k)}'
+            )
 
     return summary
 
@@ -141,15 +144,37 @@ def print_summary(summary: TaskSummary, max_k: int):
     print(f'Non-parseable submissions: {summary.non_parseable}')
     print(f'Tested pairs: {summary.tested_pairs}')
     print(f'Language-equivalent pairs: {summary.language_equivalent}')
-    print(f'Isomorphic duplicates skipped: {summary.isomorphic_duplicates}')
+    print(f'Non-equivalent pairs without a 1-buffer match: {summary.non_equivalent_without_k1_match}')
     print(f'Equivalent pairs without a match up to k={max_k}: {summary.equivalent_without_match}')
     print(f'Implication violations: {summary.implication_violations}')
-    print('First matching buffer size:')
+    print('First matching buffer size among language-equivalent pairs:')
     for k in range(1, max_k + 1):
         print(f'  k={k}: {summary.first_buffer_counts[k]}')
-    print(f'  not found: {summary.first_buffer_counts["not-found"]}')
-    print(f'Equivalence runtime: {summary.total_equivalence_runtime:.6f}s')
-    print(f'Buffered-game runtime: {summary.total_buffer_runtime:.6f}s')
+    print('Average buffered-game runtime by k:')
+    for k in range(1, max_k + 1):
+        runtimes = summary.buffer_runtimes.get(k, [])
+        if runtimes:
+            average_runtime = sum(runtimes) / len(runtimes)
+            print(f'  k={k}: {average_runtime:.6f}s over {len(runtimes)} runs')
+        else:
+            print(f'  k={k}: no measurements')
+    average_equivalence_runtime = (
+        summary.total_equivalence_runtime / summary.tested_pairs
+        if summary.tested_pairs
+        else 0.0
+    )
+    all_buffer_runtimes = [
+        runtime
+        for runtimes in summary.buffer_runtimes.values()
+        for runtime in runtimes
+    ]
+    average_buffer_runtime = (
+        sum(all_buffer_runtimes) / len(all_buffer_runtimes)
+        if all_buffer_runtimes
+        else 0.0
+    )
+    print(f'Average equivalence-test runtime: {average_equivalence_runtime:.6f}s')
+    print(f'Average buffered-game runtime: {average_buffer_runtime:.6f}s')
 
 
 def parse_args():
