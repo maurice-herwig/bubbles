@@ -6,6 +6,7 @@ the game representation separate from the legacy implementation in
 ``bubbles.old``.
 """
 
+from functools import cache
 from itertools import product
 
 from wofa import FiniteAutomata
@@ -58,27 +59,80 @@ class BufferedBisimulationGames(BisimulationGames):
         graph in advance.
         """
 
-        def _words_up_to_buffer_size():
-            """Yield every word whose length is at most the buffer size."""
-            alphabet = tuple(FiniteAutomata.alphabet)
-            for length in range(self.buffer_size + 1):
-                for letters in product(alphabet, repeat=length):
-                    yield ''.join(letters)
+        alphabet = tuple(FiniteAutomata.alphabet)
 
+        def _words_by_length() -> dict[int, tuple[str, ...]]:
+            """Build all buffer words once, grouped by their length."""
+            return {
+                length: tuple(
+                    ''.join(letters)
+                    for letters in product(alphabet, repeat=length)
+                )
+                for length in range(self.buffer_size + 1)
+            }
+
+        words_by_length = _words_by_length()
+        all_words = tuple(
+            word
+            for words in words_by_length.values()
+            for word in words
+        )
+
+        @cache
+        def _successors(automaton_index: int, state: int, letter: str) -> frozenset[int]:
+            """Return and cache one-step successors for a state and letter."""
+            return frozenset(
+                self.automatons[automaton_index].get_successors(
+                    s=state,
+                    a=letter,
+                )
+            )
+
+        @cache
+        def _predecessors(automaton_index: int, state: int, letter: str) -> frozenset[int]:
+            """Return and cache one-step predecessors for a state and letter."""
+            return frozenset(
+                self.automatons[automaton_index].get_predecessors(
+                    s=state,
+                    a=letter,
+                )
+            )
+
+        @cache
         def _reachable_states(
-                automaton: FiniteAutomata,
+                automaton_index: int,
                 state: int,
                 word: str,
-        ) -> set[int]:
-            """Return all states reachable after reading ``word``."""
+        ) -> frozenset[int]:
+            """Return and cache all states reachable after reading ``word``."""
             reachable = {state}
             for letter in word:
                 reachable = {
                     successor
                     for current_state in reachable
-                    for successor in automaton.get_successors(s=current_state, a=letter)
+                    for successor in _successors(automaton_index, current_state, letter)
                 }
-            return reachable
+            return frozenset(reachable)
+
+        @cache
+        def _reverse_reachable_states(
+                automaton_index: int,
+                target_state: int,
+                word: str,
+        ) -> frozenset[int]:
+            """Return and cache states that can read ``word`` to ``target_state``."""
+            possible_predecessors = {target_state}
+            for letter in reversed(word):
+                possible_predecessors = {
+                    predecessor
+                    for current_state in possible_predecessors
+                    for predecessor in _predecessors(
+                        automaton_index,
+                        current_state,
+                        letter,
+                    )
+                }
+            return frozenset(possible_predecessors)
 
         def _acceptance_matches(
                 state_i: int,
@@ -100,6 +154,7 @@ class BufferedBisimulationGames(BisimulationGames):
             """Construct a position in formal order ``(q0, w, q1, i, m)``."""
             return state_pair[0], buffer_word, state_pair[1], direction, phase
 
+        @cache
         def _has_acceptance_compatible_response(
                 state_pair: tuple[int, int],
                 buffer_word: str,
@@ -108,7 +163,7 @@ class BufferedBisimulationGames(BisimulationGames):
             """Return whether Player II has a complete compatible response."""
             response_start = state_pair[1 - direction]
             response_states = _reachable_states(
-                automaton=self.automatons[1 - direction],
+                automaton_index=1 - direction,
                 state=response_start,
                 word=buffer_word,
             )
@@ -202,9 +257,10 @@ class BufferedBisimulationGames(BisimulationGames):
                 last_letter = current_buffer_word[-1]
                 predecessor_buffer_word = current_buffer_word[:-1]
 
-                for predecessor_state in self.automatons[direction].get_predecessors(
-                        s=current_state_pair[direction],
-                        a=last_letter,
+                for predecessor_state in _predecessors(
+                        direction,
+                        current_state_pair[direction],
+                        last_letter,
                 ):
                     predecessor_state_pair = (
                         (predecessor_state, current_state_pair[1])
@@ -299,7 +355,7 @@ class BufferedBisimulationGames(BisimulationGames):
                 # opposite direction. Every successful response therefore has
                 # the same successor position.
                 compatible_states = _reachable_states(
-                    automaton=self.automatons[1 - direction],
+                    automaton_index=1 - direction,
                     state=state_pair[1 - direction],
                     word=buffer_word,
                 )
@@ -332,9 +388,10 @@ class BufferedBisimulationGames(BisimulationGames):
 
                 first_letter = buffer_word[0]
                 remaining_word = buffer_word[1:]
-                response_states_after_move = self.automatons[1 - direction].get_successors(
-                    s=state_pair[1 - direction],
-                    a=first_letter,
+                response_states_after_move = _successors(
+                    1 - direction,
+                    state_pair[1 - direction],
+                    first_letter,
                 )
 
                 for response_state in response_states_after_move:
@@ -379,7 +436,7 @@ class BufferedBisimulationGames(BisimulationGames):
                     raise ValueError("Flush positions must have an empty or full buffer.")
 
                 compatible_states = _reachable_states(
-                    automaton=self.automatons[1 - direction],
+                    automaton_index=1 - direction,
                     state=state_pair[1 - direction],
                     word=buffer_word,
                 )
@@ -456,7 +513,7 @@ class BufferedBisimulationGames(BisimulationGames):
 
                 for predecessor_state0 in self.states[0]:
                     for predecessor_state1 in self.states[1]:
-                        for predecessor_word in _words_up_to_buffer_size():
+                        for predecessor_word in all_words:
                             if len(predecessor_word) >= self.buffer_size:
                                 continue
 
@@ -475,11 +532,11 @@ class BufferedBisimulationGames(BisimulationGames):
                 # symbol and enumerating predecessor states in the response
                 # automaton.
                 if len(buffer_word) == self.buffer_size - 1:
-                    alphabet = tuple(FiniteAutomata.alphabet)
                     for consumed_letter in alphabet:
-                        for predecessor_response_state in self.automatons[1 - direction].get_predecessors(
-                                s=state_pair[1 - direction],
-                                a=consumed_letter,
+                        for predecessor_response_state in _predecessors(
+                                1 - direction,
+                                state_pair[1 - direction],
+                                consumed_letter,
                         ):
                             predecessor_state_pair = (
                                 (state_pair[0], predecessor_response_state)
@@ -496,25 +553,36 @@ class BufferedBisimulationGames(BisimulationGames):
                                 return True
 
                 # A Flush response always produces an empty-buffer Choice
-                # position and switches direction. Enumerating all possible
-                # predecessor pairs and legal empty/full buffer words lets the
-                # universal predecessor check filter impossible responses.
+                # position and switches direction. Reverse reachability
+                # restricts candidates to response-start states that can
+                # actually read the predecessor word to the current state.
                 if not buffer_word:
                     predecessor_direction = 1 - direction
-                    for predecessor_state0 in self.states[0]:
-                        for predecessor_state1 in self.states[1]:
-                            for predecessor_word in _words_up_to_buffer_size():
-                                if len(predecessor_word) not in (0, self.buffer_size):
-                                    continue
+                    active_predecessor_state = state_pair[predecessor_direction]
+                    target_response_state = state_pair[direction]
 
-                                predecessor = _make_position(
-                                    state_pair=(predecessor_state0, predecessor_state1),
-                                    buffer_word=predecessor_word,
-                                    direction=predecessor_direction,
-                                    phase=FLUSH,
-                                )
-                                if _add_player_ii_predecessor(predecessor):
-                                    return True
+                    for predecessor_word in (
+                            *words_by_length[0],
+                            *words_by_length[self.buffer_size],
+                    ):
+                        for response_start_state in _reverse_reachable_states(
+                                automaton_index=direction,
+                                target_state=target_response_state,
+                                word=predecessor_word,
+                        ):
+                            predecessor_state_pair = (
+                                (active_predecessor_state, response_start_state)
+                                if predecessor_direction == 0
+                                else (response_start_state, active_predecessor_state)
+                            )
+                            predecessor = _make_position(
+                                state_pair=predecessor_state_pair,
+                                buffer_word=predecessor_word,
+                                direction=predecessor_direction,
+                                phase=FLUSH,
+                            )
+                            if _add_player_ii_predecessor(predecessor):
+                                return True
 
             return False
 
@@ -547,8 +615,6 @@ class BufferedBisimulationGames(BisimulationGames):
 
         def _initial_attractor_nodes() -> bool:
             """Compute immediate Player-I wins and detect the start node."""
-            all_words = tuple(_words_up_to_buffer_size())
-
             for state0 in self.states[0]:
                 for state1 in self.states[1]:
                     state_pair = (state0, state1)
@@ -599,9 +665,10 @@ class BufferedBisimulationGames(BisimulationGames):
                             if len(buffer_word) == self.buffer_size:
                                 first_letter = buffer_word[0]
                                 remaining_word = buffer_word[1:]
-                                response_states = self.automatons[1 - direction].get_successors(
-                                    s=other_state,
-                                    a=first_letter,
+                                response_states = _successors(
+                                    1 - direction,
+                                    other_state,
+                                    first_letter,
                                 )
 
                                 if not response_states:

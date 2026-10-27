@@ -86,7 +86,8 @@ def run_task(task: str, max_k: int) -> TaskSummary:
             summary.language_equivalent += 1
 
         first_matching_k = None
-        for k in range(1, max_k + 1):
+        tested_max_k = max_k if equivalent else 1
+        for k in range(1, tested_max_k + 1):
             game.set_buffer_size(buffer_size=k)
             start_time = perf_counter()
             buffer_similar, _ = game.solve()
