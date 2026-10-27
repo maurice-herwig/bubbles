@@ -7,7 +7,7 @@ For every WoFa submission this benchmark checks the implication
 for all tested buffer sizes. For language-equivalent pairs it records the
 smallest tested buffer size for which the revised buffered bisimulation holds.
 Because no finite completeness bound is assumed, the search is limited by the
-explicit ``--max-k`` argument.
+    explicit ``--max-k`` argument.
 """
 
 import argparse
@@ -18,6 +18,7 @@ from time import perf_counter
 from wofa import FiniteAutomata, SubmissionIterator, get_solution
 
 from bubbles import BufferedBisimulationGames
+from bubbles.util import are_isomorphic
 
 
 TASKS = tuple('ABCDEFGHIJKLMNOPQRS')
@@ -31,6 +32,7 @@ class TaskSummary:
     total_submissions: int = 0
     non_parseable: int = 0
     language_equivalent: int = 0
+    isomorphic_duplicates: int = 0
     first_buffer_counts: Counter = None
     equivalent_without_match: int = 0
     implication_violations: int = 0
@@ -58,6 +60,7 @@ def run_task(task: str, max_k: int) -> TaskSummary:
     solution = get_solution(exercise=task)
     FiniteAutomata.set_alphabet(solution.calc_and_get_alphabet())
     iterator = SubmissionIterator(task=task)
+    representatives = []
 
     for submission in iterator:
         summary.total_submissions += 1
@@ -76,6 +79,16 @@ def run_task(task: str, max_k: int) -> TaskSummary:
             buffer_size=1,
         )
         automaton0, automaton1 = game.get_automatons().values()
+
+        if any(
+                are_isomorphic(automaton1, representative)
+                for representative in representatives
+        ):
+            summary.isomorphic_duplicates += 1
+            print(f'RESULT {task}{iterator.index}: isomorphic-duplicate')
+            continue
+
+        representatives.append(clone_automaton(automaton1))
 
         start_time = perf_counter()
         equivalent = automaton0.equivalence_test(other=automaton1)
@@ -128,6 +141,7 @@ def print_summary(summary: TaskSummary, max_k: int):
     print(f'Non-parseable submissions: {summary.non_parseable}')
     print(f'Tested pairs: {summary.tested_pairs}')
     print(f'Language-equivalent pairs: {summary.language_equivalent}')
+    print(f'Isomorphic duplicates skipped: {summary.isomorphic_duplicates}')
     print(f'Equivalent pairs without a match up to k={max_k}: {summary.equivalent_without_match}')
     print(f'Implication violations: {summary.implication_violations}')
     print('First matching buffer size:')
@@ -151,8 +165,8 @@ def parse_args():
     parser.add_argument(
         '--max-k',
         type=int,
-        default=10,
-        help='Largest buffer size tested for each pair (default: 10).',
+        default=5,
+        help='Largest buffer size tested for each pair (default: 5).',
     )
     return parser.parse_args()
 

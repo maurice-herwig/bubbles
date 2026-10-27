@@ -33,7 +33,8 @@ class BisimulationGames(ABC):
 
         1. remove transitions whose labels are not part of the common alphabet,
         2. remove unreachable states,
-        3. normalize the set of initial states to a single initial state,
+        3. remove unproductive states that cannot reach a final state,
+        4. normalize the set of initial states to a single initial state,
         The game implementation decides separately how missing transitions
         are interpreted. The revised games preserve missing transitions so
         that they can represent an immediate win for Player I.
@@ -52,6 +53,20 @@ class BisimulationGames(ABC):
             # again once every state is already reachable.
             if automaton.reachable() != set(range(automaton.get_number_of_states())):
                 automaton.remove_unreachable_states()
+
+            # States from which no final state is reachable cannot contribute
+            # to the accepted language. Remove them before the game starts so
+            # language-preserving dead branches do not influence the game.
+            productive_states = automaton.productive()
+            if not automaton.get_initials() & productive_states:
+                # WoFa removes all initial states when an automaton has empty
+                # language. Keep the game representation valid by replacing
+                # it with the canonical one-state empty-language automaton.
+                self.automatons[i] = FiniteAutomata.empty_nfa()
+                continue
+
+            if productive_states != set(range(automaton.get_number_of_states())):
+                automaton.remove_unproductive_states()
 
             # If the automaton has multiple initials, merge them into one
             # equivalent start state. If it already has a single initial state,
