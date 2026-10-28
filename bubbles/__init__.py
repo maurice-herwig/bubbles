@@ -7,6 +7,7 @@ from .games import (
     BufferedGamesMixin,
     Games,
     PebbleBufferedBisimulationGames,
+    PebbleSimulationGames,
     SimulationGames,
     TwoWaySetMap,
 )
@@ -20,6 +21,7 @@ __all__ = [
     "Games",
     "MultiPebbleBisimulationGames",
     "PebbleBufferedBisimulationGames",
+    "PebbleSimulationGames",
     "SimulationGames",
     "TwoWaySetMap",
 ]

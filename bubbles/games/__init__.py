@@ -14,6 +14,7 @@ from .bisimulation.BufferedBisimulationGames import (
 )
 from .bisimulation.PebbleBufferedBisimulationGames import PebbleBufferedBisimulationGames
 from .simulation.BufferedSimulationGames import BufferedSimulationGames
+from .simulation.PebbleSimulationGames import PebbleSimulationGames
 from .simulation.SimulationGames import SimulationGames
 from ..util.TwoWaySetMap import TwoWaySetMap
 
@@ -27,6 +28,7 @@ __all__ = [
     "FILL_CHOICE",
     "FLUSH",
     "PebbleBufferedBisimulationGames",
+    "PebbleSimulationGames",
     "Position",
     "SimulationGames",
     "TwoWaySetMap",

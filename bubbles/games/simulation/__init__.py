@@ -7,6 +7,7 @@ from .BufferedSimulationGames import (
     FLUSH,
     Position,
 )
+from .PebbleSimulationGames import PebbleSimulationGames
 from .SimulationGames import SimulationGames
 
 __all__ = [
@@ -15,5 +16,6 @@ __all__ = [
     "CONSUME",
     "FLUSH",
     "Position",
+    "PebbleSimulationGames",
     "SimulationGames",
 ]
