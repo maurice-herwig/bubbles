@@ -118,21 +118,33 @@ def run_task(task: str, max_k: int) -> TaskSummary:
         first_bisimulation_k = None
         first_simulation_k = None
         previous_simulation_equivalent = None
+        bisimulation_active = True
+        simulation_active = True
         tested_max_k = max_k if equivalent else 1
         for k in range(1, tested_max_k + 1):
-            bisimulation_game.set_buffer_size(buffer_size=k)
-            start_time = perf_counter()
-            bisimilar, _ = bisimulation_game.solve()
-            bisimulation_runtime = perf_counter() - start_time
-            summary.total_bisimulation_runtime += bisimulation_runtime
-            summary.bisimulation_runtimes.setdefault(k, []).append(bisimulation_runtime)
+            if bisimulation_active:
+                bisimulation_game.set_buffer_size(buffer_size=k)
+                start_time = perf_counter()
+                bisimilar, _ = bisimulation_game.solve()
+                bisimulation_runtime = perf_counter() - start_time
+                summary.total_bisimulation_runtime += bisimulation_runtime
+                summary.bisimulation_runtimes.setdefault(k, []).append(
+                    bisimulation_runtime
+                )
+            else:
+                bisimilar = True
 
-            simulation_game.set_buffer_size(buffer_size=k)
-            start_time = perf_counter()
-            simulation_equivalent, _ = simulation_game.solve()
-            simulation_runtime = perf_counter() - start_time
-            summary.total_simulation_runtime += simulation_runtime
-            summary.simulation_runtimes.setdefault(k, []).append(simulation_runtime)
+            if simulation_active:
+                simulation_game.set_buffer_size(buffer_size=k)
+                start_time = perf_counter()
+                simulation_equivalent, _ = simulation_game.solve()
+                simulation_runtime = perf_counter() - start_time
+                summary.total_simulation_runtime += simulation_runtime
+                summary.simulation_runtimes.setdefault(k, []).append(
+                    simulation_runtime
+                )
+            else:
+                simulation_equivalent = True
 
             if bisimilar:
                 if first_bisimulation_k is None:
@@ -169,6 +181,16 @@ def run_task(task: str, max_k: int) -> TaskSummary:
                     f'INFO {task}{iterator.index}: '
                     f'{k}-buffered simulation equivalent but not {k}-buffered bisimilar'
                 )
+
+            # Both relations are monotone in the buffer size. Stop evaluating
+            # an individual game after its first successful buffer size. The
+            # other game remains active if it still needs larger sizes.
+            if bisimilar:
+                bisimulation_active = False
+            if simulation_equivalent:
+                simulation_active = False
+            if not bisimulation_active and not simulation_active:
+                break
 
         if first_bisimulation_k is None:
             if equivalent:

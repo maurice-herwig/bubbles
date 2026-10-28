@@ -120,6 +120,12 @@ def run_task(task: str, max_k: int) -> TaskSummary:
 
             previous_pebble_equivalent = pebble_equivalent
 
+            # Pebble equivalence is monotone in the pebble size. Once a
+            # matching size has been found, larger sizes cannot provide a new
+            # first match and therefore do not need to be computed.
+            if pebble_equivalent:
+                break
+
         if first_pebble_k is None:
             if equivalent:
                 summary.first_pebble_counts['not-found'] += 1
