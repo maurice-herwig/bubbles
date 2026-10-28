@@ -1,6 +1,7 @@
 """Shared game infrastructure for BUBBLES."""
 
 from .Games import Games
+from .BufferedGames import BufferedGamesMixin
 from .bisimulation.BisimulationGames import BisimulationGames
 from .bisimulation.BufferedBisimulationGames import (
     BufferedBisimulationGames,
@@ -30,4 +31,5 @@ __all__ = [
     "SimulationGames",
     "TwoWaySetMap",
     "Games",
+    "BufferedGamesMixin",
 ]

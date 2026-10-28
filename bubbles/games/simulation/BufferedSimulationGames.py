@@ -6,6 +6,7 @@ from itertools import product
 from wofa import FiniteAutomata
 
 from ...util.TwoWaySetMap import TwoWaySetMap
+from ..BufferedGames import BufferedGamesMixin
 from .SimulationGames import SimulationGames
 
 
@@ -16,7 +17,7 @@ FLUSH = 2
 Position = tuple[int, str, int, int, int]
 
 
-class BufferedSimulationGames(SimulationGames):
+class BufferedSimulationGames(BufferedGamesMixin, SimulationGames):
     """Implementation of the restarting buffered simulation game.
 
     A position has the form ``(state_0, buffer_word, state_1, direction,
@@ -36,21 +37,12 @@ class BufferedSimulationGames(SimulationGames):
         ``remove_dead_states`` controls whether unproductive states are
         removed during the shared automaton preparation.
         """
-        if buffer_size < 1:
-            raise ValueError("Buffer size must be at least 1.")
-
-        self.buffer_size = buffer_size
+        self._init_buffer(buffer_size)
         super().__init__(
             automaton0=automaton0,
             automaton1=automaton1,
             remove_dead_states=remove_dead_states,
         )
-
-    def set_buffer_size(self, buffer_size: int):
-        """Set the buffer capacity used by subsequent calls to ``solve``."""
-        if buffer_size < 1:
-            raise ValueError("Buffer size must be at least 1.")
-        self.buffer_size = buffer_size
 
     def solve(self):
         """Solve the restarting buffered simulation game by attractor iteration."""

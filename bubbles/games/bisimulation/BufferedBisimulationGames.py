@@ -13,6 +13,7 @@ from wofa import FiniteAutomata
 
 from .BisimulationGames import BisimulationGames
 from ...util.TwoWaySetMap import TwoWaySetMap
+from ..BufferedGames import BufferedGamesMixin
 
 
 FILL_CHOICE = 0
@@ -24,7 +25,7 @@ FLUSH = 4
 Position = tuple[int, str, int, int, int]
 
 
-class BufferedBisimulationGames(BisimulationGames):
+class BufferedBisimulationGames(BufferedGamesMixin, BisimulationGames):
     """Skeleton for the formally revised buffered bisimulation game.
 
     Player I controls ``FILL_CHOICE`` and ``CHOICE`` positions.  Player II
@@ -40,21 +41,12 @@ class BufferedBisimulationGames(BisimulationGames):
             buffer_size: int,
             remove_dead_states: bool = True,
     ):
-        if buffer_size < 1:
-            raise ValueError("Buffer size must be at least 1.")
-
-        self.buffer_size = buffer_size
+        self._init_buffer(buffer_size)
         super().__init__(
             automaton0=automaton0,
             automaton1=automaton1,
             remove_dead_states=remove_dead_states,
         )
-
-    def set_buffer_size(self, buffer_size: int):
-        """Set the buffer capacity for subsequent calls to :meth:`solve`."""
-        if buffer_size < 1:
-            raise ValueError("Buffer size must be at least 1.")
-        self.buffer_size = buffer_size
 
     def solve(self):
         """Solve the game.
