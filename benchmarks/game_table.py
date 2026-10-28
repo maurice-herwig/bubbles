@@ -3,6 +3,7 @@
 Only language-equivalent submissions are tested with the game implementations.
 For a successful game at buffer/pebble size ``k``, all larger sizes are counted
 as successful as well. A game solve is aborted after 30 seconds by default.
+Timeouts are shown as a subscript on the corresponding result count.
 """
 
 import argparse
@@ -125,7 +126,12 @@ def _measure_game(
         try:
             equivalent, _ = _solve_with_timeout(game, timeout_seconds)
         except GameTimeout:
-            summary.timeouts_by_game[game_name][k - 1] += 1
+            # A larger buffer or pebble set cannot make the already
+            # unresolved computation smaller. Therefore this pair is counted
+            # as timed out for this and every larger value of k, although no
+            # additional solve is started.
+            for index in range(k - 1, MAX_K):
+                summary.timeouts_by_game[game_name][index] += 1
             return
 
         if equivalent:
@@ -190,22 +196,30 @@ def _latex_escape(value: str) -> str:
 
 
 def _table_header() -> list[str]:
-    """Return the three LaTeX header rows."""
-    first = [r'\textbf{Aufgabe}', r'\textbf{$n$}', r'\textbf{Sprachäquivalent}']
-    second = ['', '', '']
-    third = ['', '', '']
+    """Return the compact English LaTeX header row."""
+    first = [r'\textbf{Task}', r'\textbf{$n$}', r'\textbf{$\LangEquiv$}']
     for k in range(1, MAX_K + 1):
-        first.append(rf'\multicolumn{{6}}{{c}}{{\textbf{{k={k}}}}}')
-        for game_name in GAME_NAMES:
-            first_game_label = GAME_LABELS[game_name]
-            second.append(rf'\multicolumn{{2}}{{c}}{{{first_game_label}}}')
-            third.extend([r'Äquiv.', r'Timeout'])
-    return [
-        ' & '.join(first) + r' \\',
-        ' & '.join(second) + r' \\',
-        ' & '.join(third) + r' \\',
-        r'\midrule',
+        first.append(rf'\textbf{{k={k}}}')
+    return [' & '.join(first) + r' \\', r'\midrule']
+
+
+def _format_count(equivalent: int, timeout: int) -> str:
+    """Format a count and show a nonzero timeout as a subscript."""
+    if timeout:
+        return rf'{equivalent}_{{{timeout}}}'
+    return str(equivalent)
+
+
+def _format_tuple(summary: TaskSummary, k: int) -> str:
+    """Format the three game counts for one value of ``k``."""
+    counts = [
+        _format_count(
+            summary.equivalent_by_game[game_name][k],
+            summary.timeouts_by_game[game_name][k],
+        )
+        for game_name in GAME_NAMES
     ]
+    return rf'$({", ".join(counts)})$'
 
 
 def _table_row(summary: TaskSummary) -> str:
@@ -216,11 +230,7 @@ def _table_row(summary: TaskSummary) -> str:
         str(summary.language_equivalent),
     ]
     for k in range(MAX_K):
-        for game_name in GAME_NAMES:
-            values.extend([
-                str(summary.equivalent_by_game[game_name][k]),
-                str(summary.timeouts_by_game[game_name][k]),
-            ])
+        values.append(_format_tuple(summary, k))
     return ' & '.join(values) + r' \\'
 
 
@@ -231,7 +241,7 @@ def write_latex_table(summaries: list[TaskSummary], output: Path):
         r'\begin{table}[ht]',
         r'\centering',
         r'\small',
-        r'\begin{tabular}{lrr' + 'rr' * (MAX_K * len(GAME_NAMES)) + r'}',
+        r'\begin{tabular}{lcc' + 'c' * MAX_K + r'}',
         r'\toprule',
     ]
     rows.extend(_table_header())
@@ -241,7 +251,7 @@ def write_latex_table(summaries: list[TaskSummary], output: Path):
     rows.extend([
         r'\bottomrule',
         r'\end{tabular}',
-        r'\caption{Vergleich der drei Spiele auf dem Benchmarkdatensatz.}',
+        r'\caption{Comparison of the three games on the benchmark data set. For each $k$, entries are tuples $(x,y,z)$ in the order $x=\BufSim{k}$, $y=\PebSim{k}$, and $z=\BufBis{k}$. A subscript denotes the number of timeouts for the corresponding game.}',
         r'\label{tab:game-hierarchy-benchmark}',
         r'\end{table}',
         '',
