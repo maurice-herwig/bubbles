@@ -76,6 +76,31 @@ class CorrectionGamesTest(unittest.TestCase):
         )
         self.assertEqual(self.game._correction_size_of(correction), 5)
 
+    def test_state_only_correction_is_identified_as_unused(self):
+        """An isolated inserted state is not solved as a separate game."""
+        correction = self.game._extend_correction(
+            self.game.empty_correction,
+            inserted_states={2},
+        )
+        self.assertTrue(self.game._contains_only_unused_states(correction))
+
+    def test_empty_correction_is_not_identified_as_unused(self):
+        """The empty correction still needs a normal-game evaluation."""
+        self.assertFalse(
+            self.game._contains_only_unused_states(
+                self.game.empty_correction
+            )
+        )
+
+    def test_used_inserted_state_is_not_identified_as_unused(self):
+        """A correction with a transition must be evaluated normally."""
+        correction = self.game._extend_correction(
+            self.game.empty_correction,
+            inserted_states={2},
+            inserted_transitions={(2, 'a', 0)},
+        )
+        self.assertFalse(self.game._contains_only_unused_states(correction))
+
     def test_extend_correction_adds_inserted_state(self):
         """State insertion preserves existing correction components."""
         correction = self.game._extend_correction(

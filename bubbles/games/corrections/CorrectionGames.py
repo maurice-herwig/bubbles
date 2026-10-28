@@ -72,6 +72,19 @@ class CorrectionGames(Games):
         return sum(len(component) for component in correction)
 
     @staticmethod
+    def _contains_only_unused_states(correction: Correction) -> bool:
+        """Return whether ``correction`` only inserts currently unused states.
+
+        Such a correction has no effect on the language or on a simulation
+        game yet. It must still be retained as a search predecessor because a
+        later extension may add a transition to one of the states.
+        """
+        inserted_states, inserted_transitions, deleted_transitions, toggled_states = correction
+        return bool(inserted_states) and not (
+            inserted_transitions or deleted_transitions or toggled_states
+        )
+
+    @staticmethod
     def _extend_correction(
             correction: Correction,
             *,
@@ -227,9 +240,10 @@ class CorrectionGames(Games):
 
         for size in range(self.correction_size + 1):
             for correction in layers[size]:
-                corrected_automaton = self._apply_correction(correction)
-                if self._solve_corrected_automaton(corrected_automaton):
-                    return True, correction
+                if not self._contains_only_unused_states(correction):
+                    corrected_automaton = self._apply_correction(correction)
+                    if self._solve_corrected_automaton(corrected_automaton):
+                        return True, correction
 
                 if size == self.correction_size:
                     continue
