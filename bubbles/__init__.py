@@ -11,15 +11,12 @@ from .games import (
     SimulationGames,
     TwoWaySetMap,
 )
-from .old import MultiPebbleBisimulationGames
-
 __all__ = [
     "BisimulationGames",
     "BufferedSimulationGames",
     "BufferedBisimulationGames",
     "BufferedGamesMixin",
     "Games",
-    "MultiPebbleBisimulationGames",
     "PebbleBufferedBisimulationGames",
     "PebbleSimulationGames",
     "SimulationGames",

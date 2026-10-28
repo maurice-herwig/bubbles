@@ -2,8 +2,7 @@
 
 The actual transition rules are documented in the formal definition in
 ``Desktop/Bufferd_formal/bisimulation.tex``.  This module deliberately keeps
-the game representation separate from the legacy implementation in
-``bubbles.old``.
+the game representation separate from the benchmark and utility code.
 """
 
 from functools import cache
