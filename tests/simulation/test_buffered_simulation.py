@@ -4,7 +4,11 @@ import unittest
 
 from wofa import FiniteAutomata
 
-from bubbles import BufferedSimulationGames, SimulationGames
+from bubbles import (
+    BufferedBisimulationGames,
+    BufferedSimulationGames,
+    SimulationGames,
+)
 from bubbles.games.simulation.BufferedSimulationGames import (
     CHOICE,
     CONSUME,
@@ -29,6 +33,70 @@ class BufferedSimulationScaffoldTest(unittest.TestCase):
             transitions=[(0, 'a', 1)],
             finals={1},
         )
+
+    @staticmethod
+    def _buffer_hierarchy_witness(k):
+        """Build the formal witness separating simulation k from k+1."""
+        final0 = k + 1
+        transitions0 = [
+            *[(state, 'a', state + 1) for state in range(k)],
+            (k, 'b', final0),
+            (k, 'c', final0),
+            (final0, 'a', final0),
+            (final0, 'b', final0),
+            (final0, 'c', final0),
+        ]
+        automaton0 = FiniteAutomata(
+            initials={0},
+            transitions=transitions0,
+            finals=set(range(k + 2)),
+        )
+
+        final1 = 2 * k + 1
+        transitions1 = [
+            (0, 'a', 1),
+            (0, 'a', k + 1),
+            *[(state, 'a', state + 1) for state in range(1, k)],
+            *[(state, 'a', state + 1) for state in range(k + 1, 2 * k)],
+            (k, 'b', final1),
+            (2 * k, 'c', final1),
+            (final1, 'a', final1),
+            (final1, 'b', final1),
+            (final1, 'c', final1),
+        ]
+        automaton1 = FiniteAutomata(
+            initials={0},
+            transitions=transitions1,
+            finals=set(range(2 * k + 2)),
+        )
+        return automaton0, automaton1
+
+    @staticmethod
+    def _simulation_not_bisimulation_witness():
+        """Build the formal witness separating simulation from bisimulation."""
+        automaton0 = FiniteAutomata(
+            initials={0},
+            transitions=[
+                (0, 'a', 1),
+                (0, 'a', 2),
+                (1, 'b', 1),
+                (1, 'c', 3),
+                (2, 'b', 2),
+                (3, 'b', 3),
+            ],
+            finals={0, 1, 2, 3},
+        )
+        automaton1 = FiniteAutomata(
+            initials={0},
+            transitions=[
+                (0, 'a', 1),
+                (1, 'b', 1),
+                (1, 'c', 2),
+                (2, 'b', 2),
+            ],
+            finals={0, 1, 2},
+        )
+        return automaton0, automaton1
 
     def test_position_definition_uses_formal_order(self):
         """Positions contain both states, buffer, direction, and phase."""
@@ -183,6 +251,56 @@ class BufferedSimulationScaffoldTest(unittest.TestCase):
             game.get_automatons()[0].get_transitions(),
             [(0, 'a', 1), (0, 'b', 2)],
         )
+
+    def test_formal_simulation_hierarchy_witness(self):
+        """The formal witness separates every k from k+1."""
+        FiniteAutomata.set_alphabet({'a', 'b', 'c'})
+        for k in (1, 2, 3):
+            with self.subTest(k=k):
+                automaton0, automaton1 = self._buffer_hierarchy_witness(k)
+                self.assertTrue(
+                    automaton0.equivalence_test(other=automaton1)
+                )
+                self.assertFalse(
+                    BufferedSimulationGames(
+                        automaton0=self._buffer_hierarchy_witness(k)[0],
+                        automaton1=self._buffer_hierarchy_witness(k)[1],
+                        buffer_size=k,
+                    ).solve()[0]
+                )
+                self.assertTrue(
+                    BufferedSimulationGames(
+                        automaton0=self._buffer_hierarchy_witness(k)[0],
+                        automaton1=self._buffer_hierarchy_witness(k)[1],
+                        buffer_size=k + 1,
+                    ).solve()[0]
+                )
+
+    def test_formal_simulation_can_be_strictly_weaker_than_bisimulation(self):
+        """The formal witness is simulation equivalent but not bisimilar."""
+        FiniteAutomata.set_alphabet({'a', 'b', 'c'})
+        for k in (1, 2, 3):
+            with self.subTest(k=k):
+                simulation0, simulation1 = self._simulation_not_bisimulation_witness()
+                self.assertTrue(
+                    simulation0.equivalence_test(other=simulation1)
+                )
+                simulation0, simulation1 = self._simulation_not_bisimulation_witness()
+                self.assertTrue(
+                    BufferedSimulationGames(
+                        simulation0,
+                        simulation1,
+                        buffer_size=k,
+                    ).solve()[0]
+                )
+                bisimulation0, bisimulation1 = self._simulation_not_bisimulation_witness()
+                self.assertFalse(
+                    BufferedBisimulationGames(
+                        bisimulation0,
+                        bisimulation1,
+                        buffer_size=k,
+                    ).solve()[0]
+                )
 
 
 if __name__ == '__main__':
