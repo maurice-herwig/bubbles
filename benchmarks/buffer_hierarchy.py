@@ -1,4 +1,4 @@
-"""Measure the hierarchy of the revised buffered bisimulation game.
+"""Measure buffered bisimulation and simulation hierarchies.
 
 For every WoFa submission this benchmark checks the implication
 
@@ -17,7 +17,7 @@ from time import perf_counter
 
 from wofa import FiniteAutomata, SubmissionIterator, get_solution
 
-from bubbles import BufferedBisimulationGames
+from bubbles import BufferedBisimulationGames, BufferedSimulationGames
 
 
 TASKS = tuple('ABCDEFGHIJKLMNOPQRS')
@@ -34,17 +34,36 @@ class TaskSummary:
     non_equivalent_without_k1_match: int = 0
     first_buffer_counts: Counter = None
     equivalent_without_match: int = 0
-    implication_violations: int = 0
     tested_pairs: int = 0
     total_equivalence_runtime: float = 0.0
-    total_buffer_runtime: float = 0.0
-    buffer_runtimes: dict[int, list[float]] = None
+    total_bisimulation_runtime: float = 0.0
+    total_simulation_runtime: float = 0.0
+    bisimulation_runtimes: dict[int, list[float]] = None
+    simulation_runtimes: dict[int, list[float]] = None
+    simulation_first_buffer_counts: Counter = None
+    simulation_equivalent_without_match: int = 0
+    simulation_implication_violations_by_k: Counter = None
+    bisimulation_without_simulation_by_k: Counter = None
+    simulation_without_bisimulation_by_k: Counter = None
+    simulation_hierarchy_by_k: Counter = None
 
     def __post_init__(self):
         if self.first_buffer_counts is None:
             self.first_buffer_counts = Counter()
-        if self.buffer_runtimes is None:
-            self.buffer_runtimes = {}
+        if self.bisimulation_runtimes is None:
+            self.bisimulation_runtimes = {}
+        if self.simulation_runtimes is None:
+            self.simulation_runtimes = {}
+        if self.simulation_first_buffer_counts is None:
+            self.simulation_first_buffer_counts = Counter()
+        if self.simulation_implication_violations_by_k is None:
+            self.simulation_implication_violations_by_k = Counter()
+        if self.bisimulation_without_simulation_by_k is None:
+            self.bisimulation_without_simulation_by_k = Counter()
+        if self.simulation_without_bisimulation_by_k is None:
+            self.simulation_without_bisimulation_by_k = Counter()
+        if self.simulation_hierarchy_by_k is None:
+            self.simulation_hierarchy_by_k = Counter()
 
 
 def clone_automaton(automaton: FiniteAutomata) -> FiniteAutomata:
@@ -72,14 +91,21 @@ def run_task(task: str, max_k: int) -> TaskSummary:
             print(f'RESULT {task}{iterator.index}: non-parseable')
             continue
 
-        # The game preparation works on its inputs, so isolate the benchmark
-        # pair from the WoFa objects and reuse the prepared game for all k.
-        game = BufferedBisimulationGames(
+        # Both game preparations mutate their inputs. Use isolated copies and
+        # explicitly enable the benchmark's dead-state preprocessing.
+        bisimulation_game = BufferedBisimulationGames(
             automaton0=clone_automaton(solution),
             automaton1=clone_automaton(submission),
             buffer_size=1,
+            remove_dead_states=True,
         )
-        automaton0, automaton1 = game.get_automatons().values()
+        simulation_game = BufferedSimulationGames(
+            automaton0=clone_automaton(solution),
+            automaton1=clone_automaton(submission),
+            buffer_size=1,
+            remove_dead_states=True,
+        )
+        automaton0, automaton1 = bisimulation_game.get_automatons().values()
 
         start_time = perf_counter()
         equivalent = automaton0.equivalence_test(other=automaton1)
@@ -89,21 +115,62 @@ def run_task(task: str, max_k: int) -> TaskSummary:
         if equivalent:
             summary.language_equivalent += 1
 
-        first_matching_k = None
+        first_bisimulation_k = None
+        first_simulation_k = None
+        previous_simulation_equivalent = None
         tested_max_k = max_k if equivalent else 1
         for k in range(1, tested_max_k + 1):
-            game.set_buffer_size(buffer_size=k)
+            bisimulation_game.set_buffer_size(buffer_size=k)
             start_time = perf_counter()
-            buffer_similar, _ = game.solve()
-            buffer_runtime = perf_counter() - start_time
-            summary.total_buffer_runtime += buffer_runtime
-            summary.buffer_runtimes.setdefault(k, []).append(buffer_runtime)
+            bisimilar, _ = bisimulation_game.solve()
+            bisimulation_runtime = perf_counter() - start_time
+            summary.total_bisimulation_runtime += bisimulation_runtime
+            summary.bisimulation_runtimes.setdefault(k, []).append(bisimulation_runtime)
 
-            if buffer_similar:
-                first_matching_k = k
-                break
+            simulation_game.set_buffer_size(buffer_size=k)
+            start_time = perf_counter()
+            simulation_equivalent, _ = simulation_game.solve()
+            simulation_runtime = perf_counter() - start_time
+            summary.total_simulation_runtime += simulation_runtime
+            summary.simulation_runtimes.setdefault(k, []).append(simulation_runtime)
 
-        if first_matching_k is None:
+            if bisimilar:
+                if first_bisimulation_k is None:
+                    first_bisimulation_k = k
+            if simulation_equivalent:
+                if first_simulation_k is None:
+                    first_simulation_k = k
+
+            if (
+                    equivalent
+                    and previous_simulation_equivalent is False
+                    and simulation_equivalent
+            ):
+                summary.simulation_hierarchy_by_k[k] += 1
+            previous_simulation_equivalent = simulation_equivalent
+
+            if simulation_equivalent and not equivalent:
+                summary.simulation_implication_violations_by_k[k] += 1
+                print(
+                    f'WARNING {task}{iterator.index}: '
+                    f'{k}-buffered simulation equivalent but not language equivalent'
+                )
+
+            if bisimilar and not simulation_equivalent:
+                summary.bisimulation_without_simulation_by_k[k] += 1
+                print(
+                    f'WARNING {task}{iterator.index}: '
+                    f'{k}-buffered bisimilar but not {k}-buffered simulation equivalent'
+                )
+
+            if not bisimilar and simulation_equivalent:
+                summary.simulation_without_bisimulation_by_k[k] += 1
+                print(
+                    f'INFO {task}{iterator.index}: '
+                    f'{k}-buffered simulation equivalent but not {k}-buffered bisimilar'
+                )
+
+        if first_bisimulation_k is None:
             if equivalent:
                 summary.first_buffer_counts['not-found'] += 1
                 summary.equivalent_without_match += 1
@@ -111,25 +178,28 @@ def run_task(task: str, max_k: int) -> TaskSummary:
                 summary.non_equivalent_without_k1_match += 1
         else:
             if equivalent:
-                summary.first_buffer_counts[first_matching_k] += 1
-            else:
-                summary.implication_violations += 1
-                print(
-                    f'WARNING {task}{iterator.index}: '
-                    f'{first_matching_k}-buffer bisimilar but not language equivalent'
-                )
+                summary.first_buffer_counts[first_bisimulation_k] += 1
+
+        if first_simulation_k is None:
+            if equivalent:
+                summary.simulation_first_buffer_counts['not-found'] += 1
+                summary.simulation_equivalent_without_match += 1
+        elif equivalent:
+            summary.simulation_first_buffer_counts[first_simulation_k] += 1
 
         if equivalent:
             print(
                 f'RESULT {task}{iterator.index}: '
                 f'language-equivalent=True, '
-                f'first-buffer-k={first_matching_k or "not-found"}'
+                f'first-bisimulation-k={first_bisimulation_k or "not-found"}, '
+                f'first-simulation-k={first_simulation_k or "not-found"}'
             )
         else:
             print(
                 f'RESULT {task}{iterator.index}: '
                 f'language-equivalent=False, '
-                f'1-buffered={bool(first_matching_k)}'
+                f'1-buffered-bisimilar={bool(first_bisimulation_k)}, '
+                f'1-buffered-simulation-equivalent={bool(first_simulation_k)}'
             )
 
     return summary
@@ -146,13 +216,45 @@ def print_summary(summary: TaskSummary, max_k: int):
     print(f'Language-equivalent pairs: {summary.language_equivalent}')
     print(f'Non-equivalent pairs without a 1-buffer match: {summary.non_equivalent_without_k1_match}')
     print(f'Equivalent pairs without a match up to k={max_k}: {summary.equivalent_without_match}')
-    print(f'Implication violations: {summary.implication_violations}')
-    print('First matching buffer size among language-equivalent pairs:')
+    print(
+        'Simulation implication violations '
+        '(simulation equivalent but not language equivalent): '
+        f'{sum(summary.simulation_implication_violations_by_k.values())}'
+    )
+    for k in range(1, max_k + 1):
+        print(
+            f'  k={k}: '
+            f'{summary.simulation_implication_violations_by_k[k]}'
+        )
+    print('Bisimulation pairs without simulation equivalence by k:')
+    for k in range(1, max_k + 1):
+        print(f'  k={k}: {summary.bisimulation_without_simulation_by_k[k]}')
+    print('Simulation pairs without bisimulation by k:')
+    for k in range(1, max_k + 1):
+        print(f'  k={k}: {summary.simulation_without_bisimulation_by_k[k]}')
+    print('Simulation hierarchy transitions (not k, but k+1 equivalent):')
+    for k in range(2, max_k + 1):
+        print(
+            f'  k={k - 1} -> k={k}: '
+            f'{summary.simulation_hierarchy_by_k[k]}'
+        )
+    print('First matching bisimulation buffer size among language-equivalent pairs:')
     for k in range(1, max_k + 1):
         print(f'  k={k}: {summary.first_buffer_counts[k]}')
-    print('Average buffered-game runtime by k:')
+    print('First matching simulation buffer size among language-equivalent pairs:')
     for k in range(1, max_k + 1):
-        runtimes = summary.buffer_runtimes.get(k, [])
+        print(f'  k={k}: {summary.simulation_first_buffer_counts[k]}')
+    print('Average buffered bisimulation runtime by k:')
+    for k in range(1, max_k + 1):
+        runtimes = summary.bisimulation_runtimes.get(k, [])
+        if runtimes:
+            average_runtime = sum(runtimes) / len(runtimes)
+            print(f'  k={k}: {average_runtime:.6f}s over {len(runtimes)} runs')
+        else:
+            print(f'  k={k}: no measurements')
+    print('Average buffered simulation runtime by k:')
+    for k in range(1, max_k + 1):
+        runtimes = summary.simulation_runtimes.get(k, [])
         if runtimes:
             average_runtime = sum(runtimes) / len(runtimes)
             print(f'  k={k}: {average_runtime:.6f}s over {len(runtimes)} runs')
@@ -163,18 +265,35 @@ def print_summary(summary: TaskSummary, max_k: int):
         if summary.tested_pairs
         else 0.0
     )
-    all_buffer_runtimes = [
+    all_bisimulation_runtimes = [
         runtime
-        for runtimes in summary.buffer_runtimes.values()
+        for runtimes in summary.bisimulation_runtimes.values()
         for runtime in runtimes
     ]
-    average_buffer_runtime = (
-        sum(all_buffer_runtimes) / len(all_buffer_runtimes)
-        if all_buffer_runtimes
+    average_bisimulation_runtime = (
+        sum(all_bisimulation_runtimes) / len(all_bisimulation_runtimes)
+        if all_bisimulation_runtimes
+        else 0.0
+    )
+    all_simulation_runtimes = [
+        runtime
+        for runtimes in summary.simulation_runtimes.values()
+        for runtime in runtimes
+    ]
+    average_simulation_runtime = (
+        sum(all_simulation_runtimes) / len(all_simulation_runtimes)
+        if all_simulation_runtimes
         else 0.0
     )
     print(f'Average equivalence-test runtime: {average_equivalence_runtime:.6f}s')
-    print(f'Average buffered-game runtime: {average_buffer_runtime:.6f}s')
+    print(
+        'Average buffered bisimulation runtime: '
+        f'{average_bisimulation_runtime:.6f}s'
+    )
+    print(
+        'Average buffered simulation runtime: '
+        f'{average_simulation_runtime:.6f}s'
+    )
 
 
 def parse_args():
