@@ -7,7 +7,7 @@ the game representation separate from the legacy implementation in
 """
 
 from functools import cache
-from itertools import product
+from itertools import chain, product
 
 from wofa import FiniteAutomata
 
@@ -69,11 +69,11 @@ class BufferedBisimulationGames(BufferedGamesMixin, BisimulationGames):
             }
 
         words_by_length = _words_by_length()
-        all_words = tuple(
-            word
-            for words in words_by_length.values()
-            for word in words
-        )
+
+        def _all_words():
+            """Iterate over all buffer words without flattening them first."""
+            for words in words_by_length.values():
+                yield from words
 
         def _acceptance_matches(
                 state_i: int,
@@ -120,6 +120,7 @@ class BufferedBisimulationGames(BufferedGamesMixin, BisimulationGames):
 
         initial_state0 = next(iter(self.initials[0]))
         initial_state1 = next(iter(self.initials[1]))
+        initial_state_pair = (initial_state0, initial_state1)
         initial_position = (
             initial_state0,
             "",
@@ -312,8 +313,8 @@ class BufferedBisimulationGames(BufferedGamesMixin, BisimulationGames):
                     response_states.add(
                         _make_position(
                             state_pair=(
-                                next(iter(self.initials[0])),
-                                next(iter(self.initials[1])),
+                                initial_state_pair[0],
+                                initial_state_pair[1],
                             ),
                             buffer_word="",
                             direction=1 - direction,
@@ -454,7 +455,7 @@ class BufferedBisimulationGames(BufferedGamesMixin, BisimulationGames):
 
                 for predecessor_state0 in self.states[0]:
                     for predecessor_state1 in self.states[1]:
-                        for predecessor_word in all_words:
+                        for predecessor_word in _all_words():
                             if len(predecessor_word) >= self.buffer_size:
                                 continue
 
@@ -502,9 +503,9 @@ class BufferedBisimulationGames(BufferedGamesMixin, BisimulationGames):
                     active_predecessor_state = state_pair[predecessor_direction]
                     target_response_state = state_pair[direction]
 
-                    for predecessor_word in (
-                            *words_by_length[0],
-                            *words_by_length[self.buffer_size],
+                    for predecessor_word in chain(
+                            words_by_length[0],
+                            words_by_length[self.buffer_size],
                     ):
                         for response_start_state in self._reverse_reachable_states(
                                 automaton_index=direction,
@@ -578,7 +579,7 @@ class BufferedBisimulationGames(BufferedGamesMixin, BisimulationGames):
                         # Check positions can contain every word shorter than
                         # k. Player II loses immediately if no complete-word
                         # response has matching acceptance.
-                        for buffer_word in all_words:
+                        for buffer_word in _all_words():
                             if len(buffer_word) < self.buffer_size and not _has_acceptance_compatible_response(
                                     state_pair=state_pair,
                                     buffer_word=buffer_word,
