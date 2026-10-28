@@ -16,6 +16,13 @@ from .bisimulation.PebbleBufferedBisimulationGames import PebbleBufferedBisimula
 from .simulation.BufferedSimulationGames import BufferedSimulationGames
 from .simulation.PebbleSimulationGames import PebbleSimulationGames
 from .simulation.SimulationGames import SimulationGames
+from .corrections.CorrectionGames import CorrectionGames
+from .corrections.BufferedCorrectionSimulationGames import (
+    BufferedCorrectionSimulationGames,
+)
+from .corrections.PebbleCorrectionSimulationGames import (
+    PebbleCorrectionSimulationGames,
+)
 from ..util.TwoWaySetMap import TwoWaySetMap
 
 __all__ = [
@@ -34,4 +41,7 @@ __all__ = [
     "TwoWaySetMap",
     "Games",
     "BufferedGamesMixin",
+    "CorrectionGames",
+    "BufferedCorrectionSimulationGames",
+    "PebbleCorrectionSimulationGames",
 ]
