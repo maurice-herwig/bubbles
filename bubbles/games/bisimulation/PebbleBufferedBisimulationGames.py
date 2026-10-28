@@ -14,8 +14,17 @@ class PebbleBufferedBisimulationGames(BisimulationGames):
     a placeholder.
     """
 
-    def __init__(self, automaton0: FiniteAutomata, automaton1: FiniteAutomata):
-        super().__init__(automaton0=automaton0, automaton1=automaton1)
+    def __init__(
+            self,
+            automaton0: FiniteAutomata,
+            automaton1: FiniteAutomata,
+            remove_dead_states: bool = True,
+    ):
+        super().__init__(
+            automaton0=automaton0,
+            automaton1=automaton1,
+            remove_dead_states=remove_dead_states,
+        )
 
     def solve(self):
         """Solve the future pebble-buffered bisimulation game."""

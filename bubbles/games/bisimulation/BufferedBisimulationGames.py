@@ -38,12 +38,17 @@ class BufferedBisimulationGames(BisimulationGames):
             automaton0: FiniteAutomata,
             automaton1: FiniteAutomata,
             buffer_size: int,
+            remove_dead_states: bool = True,
     ):
         if buffer_size < 1:
             raise ValueError("Buffer size must be at least 1.")
 
         self.buffer_size = buffer_size
-        super().__init__(automaton0=automaton0, automaton1=automaton1)
+        super().__init__(
+            automaton0=automaton0,
+            automaton1=automaton1,
+            remove_dead_states=remove_dead_states,
+        )
 
     def set_buffer_size(self, buffer_size: int):
         """Set the buffer capacity for subsequent calls to :meth:`solve`."""
@@ -78,62 +83,6 @@ class BufferedBisimulationGames(BisimulationGames):
             for word in words
         )
 
-        @cache
-        def _successors(automaton_index: int, state: int, letter: str) -> frozenset[int]:
-            """Return and cache one-step successors for a state and letter."""
-            return frozenset(
-                self.automatons[automaton_index].get_successors(
-                    s=state,
-                    a=letter,
-                )
-            )
-
-        @cache
-        def _predecessors(automaton_index: int, state: int, letter: str) -> frozenset[int]:
-            """Return and cache one-step predecessors for a state and letter."""
-            return frozenset(
-                self.automatons[automaton_index].get_predecessors(
-                    s=state,
-                    a=letter,
-                )
-            )
-
-        @cache
-        def _reachable_states(
-                automaton_index: int,
-                state: int,
-                word: str,
-        ) -> frozenset[int]:
-            """Return and cache all states reachable after reading ``word``."""
-            reachable = {state}
-            for letter in word:
-                reachable = {
-                    successor
-                    for current_state in reachable
-                    for successor in _successors(automaton_index, current_state, letter)
-                }
-            return frozenset(reachable)
-
-        @cache
-        def _reverse_reachable_states(
-                automaton_index: int,
-                target_state: int,
-                word: str,
-        ) -> frozenset[int]:
-            """Return and cache states that can read ``word`` to ``target_state``."""
-            possible_predecessors = {target_state}
-            for letter in reversed(word):
-                possible_predecessors = {
-                    predecessor
-                    for current_state in possible_predecessors
-                    for predecessor in _predecessors(
-                        automaton_index,
-                        current_state,
-                        letter,
-                    )
-                }
-            return frozenset(possible_predecessors)
-
         def _acceptance_matches(
                 state_i: int,
                 response_state: int,
@@ -162,7 +111,7 @@ class BufferedBisimulationGames(BisimulationGames):
         ) -> bool:
             """Return whether Player II has a complete compatible response."""
             response_start = state_pair[1 - direction]
-            response_states = _reachable_states(
+            response_states = self._reachable_states(
                 automaton_index=1 - direction,
                 state=response_start,
                 word=buffer_word,
@@ -257,7 +206,7 @@ class BufferedBisimulationGames(BisimulationGames):
                 last_letter = current_buffer_word[-1]
                 predecessor_buffer_word = current_buffer_word[:-1]
 
-                for predecessor_state in _predecessors(
+                for predecessor_state in self._predecessors(
                         direction,
                         current_state_pair[direction],
                         last_letter,
@@ -354,7 +303,7 @@ class BufferedBisimulationGames(BisimulationGames):
                 # automaton and then restarts from the initial states in the
                 # opposite direction. Every successful response therefore has
                 # the same successor position.
-                compatible_states = _reachable_states(
+                compatible_states = self._reachable_states(
                     automaton_index=1 - direction,
                     state=state_pair[1 - direction],
                     word=buffer_word,
@@ -388,7 +337,7 @@ class BufferedBisimulationGames(BisimulationGames):
 
                 first_letter = buffer_word[0]
                 remaining_word = buffer_word[1:]
-                response_states_after_move = _successors(
+                response_states_after_move = self._successors(
                     1 - direction,
                     state_pair[1 - direction],
                     first_letter,
@@ -435,7 +384,7 @@ class BufferedBisimulationGames(BisimulationGames):
                 if len(buffer_word) not in (0, self.buffer_size):
                     raise ValueError("Flush positions must have an empty or full buffer.")
 
-                compatible_states = _reachable_states(
+                compatible_states = self._reachable_states(
                     automaton_index=1 - direction,
                     state=state_pair[1 - direction],
                     word=buffer_word,
@@ -533,7 +482,7 @@ class BufferedBisimulationGames(BisimulationGames):
                 # automaton.
                 if len(buffer_word) == self.buffer_size - 1:
                     for consumed_letter in alphabet:
-                        for predecessor_response_state in _predecessors(
+                        for predecessor_response_state in self._predecessors(
                                 1 - direction,
                                 state_pair[1 - direction],
                                 consumed_letter,
@@ -565,7 +514,7 @@ class BufferedBisimulationGames(BisimulationGames):
                             *words_by_length[0],
                             *words_by_length[self.buffer_size],
                     ):
-                        for response_start_state in _reverse_reachable_states(
+                        for response_start_state in self._reverse_reachable_states(
                                 automaton_index=direction,
                                 target_state=target_response_state,
                                 word=predecessor_word,
@@ -665,7 +614,7 @@ class BufferedBisimulationGames(BisimulationGames):
                             if len(buffer_word) == self.buffer_size:
                                 first_letter = buffer_word[0]
                                 remaining_word = buffer_word[1:]
-                                response_states = _successors(
+                                response_states = self._successors(
                                     1 - direction,
                                     other_state,
                                     first_letter,

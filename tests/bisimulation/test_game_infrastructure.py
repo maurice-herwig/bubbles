@@ -161,6 +161,47 @@ class GameInfrastructureTest(unittest.TestCase):
             self.assertEqual(automaton.get_finals(), set())
             self.assertEqual(automaton.get_transitions(), [])
 
+    def test_dead_state_removal_can_be_disabled(self):
+        """Dead states are removed by default but preserved when requested."""
+        FiniteAutomata.set_alphabet({'a', 'b'})
+
+        default_game = BufferedBisimulationGames(
+            FiniteAutomata(
+                initials={0},
+                transitions=[(0, 'a', 1), (0, 'b', 2)],
+                finals={2},
+            ),
+            FiniteAutomata(
+                initials={0},
+                transitions=[(0, 'b', 1)],
+                finals={1},
+            ),
+            buffer_size=1,
+        )
+        self.assertEqual(
+            default_game.get_automatons()[0].get_transitions(),
+            [(0, 'b', 1)],
+        )
+
+        preserved_game = BufferedBisimulationGames(
+            FiniteAutomata(
+                initials={0},
+                transitions=[(0, 'a', 1), (0, 'b', 2)],
+                finals={2},
+            ),
+            FiniteAutomata(
+                initials={0},
+                transitions=[(0, 'b', 1)],
+                finals={1},
+            ),
+            buffer_size=1,
+            remove_dead_states=False,
+        )
+        self.assertEqual(
+            preserved_game.get_automatons()[0].get_transitions(),
+            [(0, 'a', 1), (0, 'b', 2)],
+        )
+
     def test_buffer_size_validation(self):
         """Buffer capacities must be positive."""
         FiniteAutomata.set_alphabet({'a'})
