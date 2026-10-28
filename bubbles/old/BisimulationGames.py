@@ -2,7 +2,7 @@
 
 from wofa import FiniteAutomata
 
-from ..games.BisimulationGames import BisimulationGames as SharedBisimulationGames
+from ..games.bisimulation.BisimulationGames import BisimulationGames as SharedBisimulationGames
 
 
 class BisimulationGames(SharedBisimulationGames):

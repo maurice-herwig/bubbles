@@ -3,7 +3,7 @@ from typing import Callable
 
 from wofa import FiniteAutomata
 
-from .TwoWaySetMap import TwoWaySetMap
+from ...util.TwoWaySetMap import TwoWaySetMap
 
 
 class BisimulationGames(ABC):

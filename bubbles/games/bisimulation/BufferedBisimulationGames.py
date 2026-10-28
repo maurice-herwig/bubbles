@@ -12,7 +12,7 @@ from itertools import product
 from wofa import FiniteAutomata
 
 from .BisimulationGames import BisimulationGames
-from .TwoWaySetMap import TwoWaySetMap
+from ...util.TwoWaySetMap import TwoWaySetMap
 
 
 FILL_CHOICE = 0

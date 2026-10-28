@@ -1,7 +1,7 @@
 """Shared game infrastructure for BUBBLES."""
 
-from .BisimulationGames import BisimulationGames
-from .BufferedBisimulationGames import (
+from .bisimulation.BisimulationGames import BisimulationGames
+from .bisimulation.BufferedBisimulationGames import (
     BufferedBisimulationGames,
     CHECK,
     CHOICE,
@@ -10,8 +10,8 @@ from .BufferedBisimulationGames import (
     FLUSH,
     Position,
 )
-from .PebbleBufferedBisimulationGames import PebbleBufferedBisimulationGames
-from .TwoWaySetMap import TwoWaySetMap
+from .bisimulation.PebbleBufferedBisimulationGames import PebbleBufferedBisimulationGames
+from ..util.TwoWaySetMap import TwoWaySetMap
 
 __all__ = [
     "BisimulationGames",

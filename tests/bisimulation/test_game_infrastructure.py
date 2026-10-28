@@ -5,7 +5,7 @@ import unittest
 from wofa import FiniteAutomata
 
 from bubbles.games import BufferedBisimulationGames, TwoWaySetMap
-from bubbles.games.BisimulationGames import BisimulationGames
+from bubbles.games.bisimulation.BisimulationGames import BisimulationGames
 
 
 class GameInfrastructureTest(unittest.TestCase):
