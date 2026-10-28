@@ -94,8 +94,8 @@ class PebbleSimulationTest(unittest.TestCase):
             ).solve()[0]
         )
 
-    def test_formal_pebble_hierarchy_witness(self):
-        """The formal witness separates k pebbles from k+1 pebbles."""
+    def test_pebble_hierarchy_separates_k_from_k_plus_one(self):
+        """The formal witness is not k-, but is k+1-pebble equivalent."""
         for k in (1, 2, 3):
             with self.subTest(k=k):
                 automaton0, automaton1, alphabet = self._hierarchy_witness(k)
