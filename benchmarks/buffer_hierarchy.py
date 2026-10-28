@@ -11,6 +11,7 @@ explicit ``--max-k`` argument.
 """
 
 import argparse
+import signal
 from collections import Counter
 from dataclasses import dataclass
 from time import perf_counter
@@ -21,6 +22,16 @@ from bubbles import BufferedBisimulationGames, BufferedSimulationGames
 
 
 TASKS = tuple('ABCDEFGHIJKLMNOPQRS')
+DEFAULT_TIMEOUT_SECONDS = 30.0
+
+
+class BufferedGameTimeout(Exception):
+    """Raised when one buffered-game solve exceeds its time limit."""
+
+
+def _timeout_handler(signum, frame):
+    """Raise the timeout exception when the per-solve timer expires."""
+    raise BufferedGameTimeout
 
 
 @dataclass
@@ -46,6 +57,9 @@ class TaskSummary:
     bisimulation_without_simulation_by_k: Counter = None
     simulation_without_bisimulation_by_k: Counter = None
     simulation_hierarchy_by_k: Counter = None
+    bisimulation_timeouts_by_k: Counter = None
+    simulation_timeouts_by_k: Counter = None
+    timed_out_pairs: int = 0
 
     def __post_init__(self):
         if self.first_buffer_counts is None:
@@ -64,6 +78,22 @@ class TaskSummary:
             self.simulation_without_bisimulation_by_k = Counter()
         if self.simulation_hierarchy_by_k is None:
             self.simulation_hierarchy_by_k = Counter()
+        if self.bisimulation_timeouts_by_k is None:
+            self.bisimulation_timeouts_by_k = Counter()
+        if self.simulation_timeouts_by_k is None:
+            self.simulation_timeouts_by_k = Counter()
+
+
+def _solve_with_timeout(game, timeout_seconds: float):
+    """Solve one buffered game and abort it after ``timeout_seconds``."""
+    previous_handler = signal.getsignal(signal.SIGALRM)
+    signal.signal(signal.SIGALRM, _timeout_handler)
+    signal.setitimer(signal.ITIMER_REAL, timeout_seconds)
+    try:
+        return game.solve()
+    finally:
+        signal.setitimer(signal.ITIMER_REAL, 0)
+        signal.signal(signal.SIGALRM, previous_handler)
 
 
 def clone_automaton(automaton: FiniteAutomata) -> FiniteAutomata:
@@ -75,7 +105,11 @@ def clone_automaton(automaton: FiniteAutomata) -> FiniteAutomata:
     )
 
 
-def run_task(task: str, max_k: int) -> TaskSummary:
+def run_task(
+        task: str,
+        max_k: int,
+        timeout_seconds: float = DEFAULT_TIMEOUT_SECONDS,
+) -> TaskSummary:
     """Run the hierarchy experiment for all submissions of ``task``."""
     summary = TaskSummary(task=task)
     solution = get_solution(exercise=task)
@@ -120,12 +154,23 @@ def run_task(task: str, max_k: int) -> TaskSummary:
         previous_simulation_equivalent = None
         bisimulation_active = True
         simulation_active = True
+        bisimulation_timeout_k = None
+        simulation_timeout_k = None
         tested_max_k = max_k if equivalent else 1
         for k in range(1, tested_max_k + 1):
             if bisimulation_active:
                 bisimulation_game.set_buffer_size(buffer_size=k)
                 start_time = perf_counter()
-                bisimilar, _ = bisimulation_game.solve()
+                try:
+                    bisimilar, _ = _solve_with_timeout(
+                        bisimulation_game,
+                        timeout_seconds=timeout_seconds,
+                    )
+                except BufferedGameTimeout:
+                    bisimilar = None
+                    bisimulation_timeout_k = k
+                    bisimulation_active = False
+                    summary.bisimulation_timeouts_by_k[k] += 1
                 bisimulation_runtime = perf_counter() - start_time
                 summary.total_bisimulation_runtime += bisimulation_runtime
                 summary.bisimulation_runtimes.setdefault(k, []).append(
@@ -137,7 +182,16 @@ def run_task(task: str, max_k: int) -> TaskSummary:
             if simulation_active:
                 simulation_game.set_buffer_size(buffer_size=k)
                 start_time = perf_counter()
-                simulation_equivalent, _ = simulation_game.solve()
+                try:
+                    simulation_equivalent, _ = _solve_with_timeout(
+                        simulation_game,
+                        timeout_seconds=timeout_seconds,
+                    )
+                except BufferedGameTimeout:
+                    simulation_equivalent = None
+                    simulation_timeout_k = k
+                    simulation_active = False
+                    summary.simulation_timeouts_by_k[k] += 1
                 simulation_runtime = perf_counter() - start_time
                 summary.total_simulation_runtime += simulation_runtime
                 summary.simulation_runtimes.setdefault(k, []).append(
@@ -146,36 +200,36 @@ def run_task(task: str, max_k: int) -> TaskSummary:
             else:
                 simulation_equivalent = True
 
-            if bisimilar:
+            if bisimilar is True:
                 if first_bisimulation_k is None:
                     first_bisimulation_k = k
-            if simulation_equivalent:
+            if simulation_equivalent is True:
                 if first_simulation_k is None:
                     first_simulation_k = k
 
             if (
                     equivalent
                     and previous_simulation_equivalent is False
-                    and simulation_equivalent
+                    and simulation_equivalent is True
             ):
                 summary.simulation_hierarchy_by_k[k] += 1
             previous_simulation_equivalent = simulation_equivalent
 
-            if simulation_equivalent and not equivalent:
+            if simulation_equivalent is True and not equivalent:
                 summary.simulation_implication_violations_by_k[k] += 1
                 print(
                     f'WARNING {task}{iterator.index}: '
                     f'{k}-buffered simulation equivalent but not language equivalent'
                 )
 
-            if bisimilar and not simulation_equivalent:
+            if bisimilar is True and simulation_equivalent is False:
                 summary.bisimulation_without_simulation_by_k[k] += 1
                 print(
                     f'WARNING {task}{iterator.index}: '
                     f'{k}-buffered bisimilar but not {k}-buffered simulation equivalent'
                 )
 
-            if not bisimilar and simulation_equivalent:
+            if bisimilar is False and simulation_equivalent is True:
                 summary.simulation_without_bisimulation_by_k[k] += 1
                 print(
                     f'INFO {task}{iterator.index}: '
@@ -185,14 +239,20 @@ def run_task(task: str, max_k: int) -> TaskSummary:
             # Both relations are monotone in the buffer size. Stop evaluating
             # an individual game after its first successful buffer size. The
             # other game remains active if it still needs larger sizes.
-            if bisimilar:
+            if bisimilar is True:
                 bisimulation_active = False
-            if simulation_equivalent:
+            if simulation_equivalent is True:
                 simulation_active = False
             if not bisimulation_active and not simulation_active:
                 break
 
-        if first_bisimulation_k is None:
+        pair_timed_out = (
+            bisimulation_timeout_k is not None
+            or simulation_timeout_k is not None
+        )
+        if pair_timed_out:
+            summary.timed_out_pairs += 1
+        elif first_bisimulation_k is None:
             if equivalent:
                 summary.first_buffer_counts['not-found'] += 1
                 summary.equivalent_without_match += 1
@@ -202,14 +262,25 @@ def run_task(task: str, max_k: int) -> TaskSummary:
             if equivalent:
                 summary.first_buffer_counts[first_bisimulation_k] += 1
 
-        if first_simulation_k is None:
+        if not pair_timed_out and first_simulation_k is None:
             if equivalent:
                 summary.simulation_first_buffer_counts['not-found'] += 1
                 summary.simulation_equivalent_without_match += 1
         elif equivalent:
             summary.simulation_first_buffer_counts[first_simulation_k] += 1
 
-        if equivalent:
+        if pair_timed_out:
+            timeout_parts = []
+            if bisimulation_timeout_k is not None:
+                timeout_parts.append(f'bisimulation-k={bisimulation_timeout_k}')
+            if simulation_timeout_k is not None:
+                timeout_parts.append(f'simulation-k={simulation_timeout_k}')
+            print(
+                f'RESULT {task}{iterator.index}: timeout '
+                f'({", ".join(timeout_parts)}) '
+                f'after {timeout_seconds:g}s'
+            )
+        elif equivalent:
             print(
                 f'RESULT {task}{iterator.index}: '
                 f'language-equivalent=True, '
@@ -238,6 +309,13 @@ def print_summary(summary: TaskSummary, max_k: int):
     print(f'Language-equivalent pairs: {summary.language_equivalent}')
     print(f'Non-equivalent pairs without a 1-buffer match: {summary.non_equivalent_without_k1_match}')
     print(f'Equivalent pairs without a match up to k={max_k}: {summary.equivalent_without_match}')
+    print(f'Buffered-game timeouts: {summary.timed_out_pairs}')
+    print('Bisimulation timeouts by k:')
+    for k in range(1, max_k + 1):
+        print(f'  k={k}: {summary.bisimulation_timeouts_by_k[k]}')
+    print('Simulation timeouts by k:')
+    for k in range(1, max_k + 1):
+        print(f'  k={k}: {summary.simulation_timeouts_by_k[k]}')
     print(
         'Simulation implication violations '
         '(simulation equivalent but not language equivalent): '
@@ -334,6 +412,15 @@ def parse_args():
         default=5,
         help='Largest buffer size tested for each pair (default: 5).',
     )
+    parser.add_argument(
+        '--timeout',
+        type=float,
+        default=DEFAULT_TIMEOUT_SECONDS,
+        help=(
+            'Maximum runtime in seconds per buffered-game solve '
+            f'(default: {DEFAULT_TIMEOUT_SECONDS:g}).'
+        ),
+    )
     return parser.parse_args()
 
 
@@ -342,10 +429,19 @@ def main():
     args = parse_args()
     if args.max_k < 1:
         raise ValueError('--max-k must be at least 1.')
+    if args.timeout <= 0:
+        raise ValueError('--timeout must be positive.')
 
     tasks = args.tasks or TASKS
     for task in tasks:
-        print_summary(run_task(task=task, max_k=args.max_k), max_k=args.max_k)
+        print_summary(
+            run_task(
+                task=task,
+                max_k=args.max_k,
+                timeout_seconds=args.timeout,
+            ),
+            max_k=args.max_k,
+        )
 
 
 if __name__ == '__main__':

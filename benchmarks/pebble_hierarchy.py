@@ -6,6 +6,7 @@ corresponding buffered hierarchy benchmark.
 """
 
 import argparse
+import signal
 from collections import Counter
 from dataclasses import dataclass
 from time import perf_counter
@@ -16,6 +17,16 @@ from bubbles import PebbleSimulationGames
 
 
 TASKS = tuple('ABCDEFGHIJKLMNOPQRS')
+DEFAULT_TIMEOUT_SECONDS = 30.0
+
+
+class PebbleGameTimeout(Exception):
+    """Raised when one pebble-game solve exceeds its time limit."""
+
+
+def _timeout_handler(signum, frame):
+    """Raise the timeout exception when the per-solve timer expires."""
+    raise PebbleGameTimeout
 
 
 @dataclass
@@ -29,9 +40,11 @@ class TaskSummary:
     language_equivalent: int = 0
     non_equivalent_without_k1_match: int = 0
     equivalent_without_match: int = 0
+    timed_out_pairs: int = 0
     first_pebble_counts: Counter = None
     implication_violations_by_k: Counter = None
     hierarchy_transitions_by_k: Counter = None
+    timeouts_by_k: Counter = None
     total_equivalence_runtime: float = 0.0
     total_pebble_runtime: float = 0.0
     pebble_runtimes: dict[int, list[float]] = None
@@ -43,6 +56,8 @@ class TaskSummary:
             self.implication_violations_by_k = Counter()
         if self.hierarchy_transitions_by_k is None:
             self.hierarchy_transitions_by_k = Counter()
+        if self.timeouts_by_k is None:
+            self.timeouts_by_k = Counter()
         if self.pebble_runtimes is None:
             self.pebble_runtimes = {}
 
@@ -56,7 +71,28 @@ def clone_automaton(automaton: FiniteAutomata) -> FiniteAutomata:
     )
 
 
-def run_task(task: str, max_k: int) -> TaskSummary:
+def _solve_with_timeout(game, timeout_seconds: float):
+    """Solve one pebble game and abort it after ``timeout_seconds``.
+
+    The benchmark runs in the main process, so a POSIX interval timer avoids
+    having to move the game into a worker process and preserves the current
+    runtime measurements.
+    """
+    previous_handler = signal.getsignal(signal.SIGALRM)
+    signal.signal(signal.SIGALRM, _timeout_handler)
+    signal.setitimer(signal.ITIMER_REAL, timeout_seconds)
+    try:
+        return game.solve()
+    finally:
+        signal.setitimer(signal.ITIMER_REAL, 0)
+        signal.signal(signal.SIGALRM, previous_handler)
+
+
+def run_task(
+        task: str,
+        max_k: int,
+        timeout_seconds: float = DEFAULT_TIMEOUT_SECONDS,
+) -> TaskSummary:
     """Run the pebble hierarchy experiment for all submissions of ``task``."""
     summary = TaskSummary(task=task)
     solution = get_solution(exercise=task)
@@ -90,12 +126,34 @@ def run_task(task: str, max_k: int) -> TaskSummary:
 
         first_pebble_k = None
         previous_pebble_equivalent = None
+        timeout_k = None
         tested_max_k = max_k if equivalent else 1
 
         for k in range(1, tested_max_k + 1):
             game.set_pebble_size(k)
             start_time = perf_counter()
-            pebble_equivalent, _ = game.solve()
+
+            try:
+                pebble_equivalent, _ = _solve_with_timeout(
+                    game,
+                    timeout_seconds=timeout_seconds,
+                )
+            except PebbleGameTimeout:
+                pebble_runtime = perf_counter() - start_time
+                timeout_k = k
+                summary.timed_out_pairs += 1
+                summary.timeouts_by_k[k] += 1
+                summary.total_pebble_runtime += pebble_runtime
+                summary.pebble_runtimes.setdefault(k, []).append(
+                    pebble_runtime
+                )
+                print(
+                    f'RESULT {task}{iterator.index}: '
+                    f'pebble-timeout-k={k} '
+                    f'after {timeout_seconds:g}s'
+                )
+                break
+
             pebble_runtime = perf_counter() - start_time
 
             summary.total_pebble_runtime += pebble_runtime
@@ -126,14 +184,17 @@ def run_task(task: str, max_k: int) -> TaskSummary:
             if pebble_equivalent:
                 break
 
-        if first_pebble_k is None:
+        if timeout_k is None and first_pebble_k is None:
             if equivalent:
                 summary.first_pebble_counts['not-found'] += 1
                 summary.equivalent_without_match += 1
             else:
                 summary.non_equivalent_without_k1_match += 1
-        elif equivalent:
+        elif timeout_k is None and equivalent:
             summary.first_pebble_counts[first_pebble_k] += 1
+
+        if timeout_k is not None:
+            continue
 
         if equivalent:
             print(
@@ -168,6 +229,9 @@ def print_summary(summary: TaskSummary, max_k: int):
         f'Equivalent pairs without a match up to k={max_k}: '
         f'{summary.equivalent_without_match}'
     )
+    print(f'Pebble-game timeouts: {summary.timed_out_pairs}')
+    for k in range(1, max_k + 1):
+        print(f'  k={k}: {summary.timeouts_by_k[k]}')
     print(
         'Pebble implication violations '
         '(pebble equivalent but not language equivalent): '
@@ -231,6 +295,15 @@ def parse_args():
         default=5,
         help='Largest pebble size tested for equivalent pairs (default: 5).',
     )
+    parser.add_argument(
+        '--timeout',
+        type=float,
+        default=DEFAULT_TIMEOUT_SECONDS,
+        help=(
+            'Maximum runtime in seconds per pebble-game solve '
+            f'(default: {DEFAULT_TIMEOUT_SECONDS:g}).'
+        ),
+    )
     return parser.parse_args()
 
 
@@ -239,10 +312,19 @@ def main():
     args = parse_args()
     if args.max_k < 1:
         raise ValueError('--max-k must be at least 1.')
+    if args.timeout <= 0:
+        raise ValueError('--timeout must be positive.')
 
     tasks = args.tasks or TASKS
     for task in tasks:
-        print_summary(run_task(task=task, max_k=args.max_k), max_k=args.max_k)
+        print_summary(
+            run_task(
+                task=task,
+                max_k=args.max_k,
+                timeout_seconds=args.timeout,
+            ),
+            max_k=args.max_k,
+        )
 
 
 if __name__ == '__main__':
