@@ -12,7 +12,6 @@ from .bisimulation.BufferedBisimulationGames import (
     FLUSH,
     Position,
 )
-from .bisimulation.PebbleBufferedBisimulationGames import PebbleBufferedBisimulationGames
 from .simulation.BufferedSimulationGames import BufferedSimulationGames
 from .simulation.PebbleSimulationGames import PebbleSimulationGames
 from .simulation.SimulationGames import SimulationGames
@@ -34,7 +33,6 @@ __all__ = [
     "CONSUME",
     "FILL_CHOICE",
     "FLUSH",
-    "PebbleBufferedBisimulationGames",
     "PebbleSimulationGames",
     "Position",
     "SimulationGames",

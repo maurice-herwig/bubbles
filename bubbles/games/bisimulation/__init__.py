@@ -10,8 +10,6 @@ from .BufferedBisimulationGames import (
     FLUSH,
     Position,
 )
-from .PebbleBufferedBisimulationGames import PebbleBufferedBisimulationGames
-
 __all__ = [
     "BisimulationGames",
     "BufferedBisimulationGames",
@@ -20,6 +18,5 @@ __all__ = [
     "CONSUME",
     "FILL_CHOICE",
     "FLUSH",
-    "PebbleBufferedBisimulationGames",
     "Position",
 ]
