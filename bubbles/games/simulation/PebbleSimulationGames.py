@@ -1,4 +1,4 @@
-"""Restarting pebble simulation game."""
+"""Pebble simulation equivalence game."""
 
 from functools import cache
 from itertools import combinations
@@ -9,13 +9,14 @@ from ...util.TwoWaySetMap import TwoWaySetMap
 from .SimulationGames import SimulationGames
 
 
-CHOICE = 0
+INITIAL = 0
+CHOICE = 1
 
 Position = tuple[int, int, frozenset[int], int | str]
 
 
 class PebbleSimulationGames(SimulationGames):
-    """Solve the newly defined restarting pebble simulation game.
+    """Solve the pebble simulation equivalence game.
 
     Positions have the formal shape
     ``(direction, active_state, pebble_states, phase)``. The pebble set is
@@ -64,7 +65,7 @@ class PebbleSimulationGames(SimulationGames):
         return self._pebble_sets_cache[cache_key]
 
     def solve(self):
-        """Solve the restarting pebble simulation game by attractor iteration."""
+        """Solve the game by on-the-fly attractor iteration."""
         alphabet = tuple(FiniteAutomata.alphabet)
         all_attractor_nodes: set[Position] = set()
         new_attractor_nodes: set[Position] = set()
@@ -72,13 +73,26 @@ class PebbleSimulationGames(SimulationGames):
 
         initial_state0 = next(iter(self.initials[0]))
         initial_state1 = next(iter(self.initials[1]))
-        initial_state_pair = (initial_state0, initial_state1)
         initial_position = (
-            0,
-            initial_state0,
-            frozenset({initial_state1}),
-            CHOICE,
+            -1,
+            -1,
+            frozenset(),
+            INITIAL,
         )
+        initial_choice_positions = frozenset({
+            (
+                0,
+                initial_state0,
+                frozenset({initial_state1}),
+                CHOICE,
+            ),
+            (
+                1,
+                initial_state1,
+                frozenset({initial_state0}),
+                CHOICE,
+            ),
+        })
 
         def _make_position(
                 direction: int,
@@ -184,12 +198,14 @@ class PebbleSimulationGames(SimulationGames):
         def _add_player_i_predecessor(position: Position) -> bool:
             """Add Player-I predecessors of an attractor position.
 
-            Player I controls ``CHOICE`` positions and may either choose a
-            transition in the active automaton or restart in the opposite
-            direction. Therefore this helper handles two predecessor forms:
+            Player I controls ``CHOICE`` positions and chooses a transition
+            in the active automaton. The virtual initial position is also
+            controlled by Player I and has both initial direction choices as
+            successors. Therefore this helper handles two predecessor forms:
 
-            * reverse a symbol transition into a ``MOVE`` position, and
-            * reverse a restart into an initial ``CHOICE`` position.
+            * reverse a symbol transition into a ``CHOICE`` position, and
+            * reverse an initial direction choice into the virtual initial
+              position.
 
             Every generated predecessor is added through
             ``_add_attractor_node`` so that the actual initial position is
@@ -200,9 +216,12 @@ class PebbleSimulationGames(SimulationGames):
             """
             direction, active_state, pebble_states, phase = position
 
+            if position in initial_choice_positions:
+                return _add_attractor_node(initial_position)
+
             # A symbol phase is a Player-II position reached after Player I
             # selected a symbol and an active-automaton transition.
-            if phase != CHOICE:
+            if phase not in (INITIAL, CHOICE):
                 for predecessor_state in self._predecessors(
                         direction,
                         active_state,
@@ -217,31 +236,6 @@ class PebbleSimulationGames(SimulationGames):
                     if _add_attractor_node(predecessor):
                         return True
                 return False
-
-            # A restart always targets the initial Choice position in the
-            # selected direction. Reverse that edge for all possible active
-            # states and pebble sets in the opposite direction.
-            target_initial_position = _make_position(
-                direction,
-                initial_state_pair[direction],
-                frozenset({initial_state_pair[1 - direction]}),
-                CHOICE,
-            )
-            if position != target_initial_position:
-                return False
-
-            predecessor_direction = 1 - direction
-            for predecessor_state in self.states[predecessor_direction]:
-                for predecessor_pebble_states in _pebble_sets(direction):
-                    predecessor = _make_position(
-                        predecessor_direction,
-                        predecessor_state,
-                        predecessor_pebble_states,
-                        CHOICE,
-                    )
-                    if _add_attractor_node(predecessor):
-                        return True
-
             return False
 
         @cache
@@ -253,7 +247,7 @@ class PebbleSimulationGames(SimulationGames):
             does not exceed ``self.pebble_size``.
             """
             direction, active_state, pebble_states, phase = position
-            if phase == CHOICE:
+            if phase in (INITIAL, CHOICE):
                 return frozenset()
 
             response_states = _response_states(

@@ -1,4 +1,4 @@
-"""Tests for the restarting pebble simulation game."""
+"""Tests for the pebble simulation equivalence game."""
 
 import unittest
 
@@ -73,8 +73,8 @@ class PebbleSimulationTest(unittest.TestCase):
             PebbleSimulationGames(accepting, rejecting, 1).solve()[0]
         )
 
-    def test_restart_predecessors_are_checked_in_both_directions(self):
-        """A violation after a restart is propagated back to the start."""
+    def test_initial_direction_choices_are_checked_in_both_directions(self):
+        """The initial position checks both possible directions."""
         FiniteAutomata.set_alphabet({'a'})
         nonaccepting_initial = FiniteAutomata(
             {0},
@@ -92,6 +92,41 @@ class PebbleSimulationTest(unittest.TestCase):
                 accepting_initial,
                 1,
             ).solve()[0]
+        )
+
+    def test_response_attractor_propagates_to_initial_direction(self):
+        """A losing response position reaches the virtual initial position."""
+        FiniteAutomata.set_alphabet({'a', 'b'})
+        automaton0 = FiniteAutomata(
+            {0},
+            [
+                (0, 'a', 0),
+                (0, 'a', 2),
+                (0, 'b', 1),
+                (1, 'a', 0),
+                (1, 'a', 1),
+                (1, 'b', 0),
+                (1, 'b', 2),
+                (2, 'a', 1),
+            ],
+            {1, 2},
+        )
+        automaton1 = FiniteAutomata(
+            {0},
+            [
+                (0, 'a', 0),
+                (0, 'b', 0),
+                (0, 'b', 1),
+                (0, 'b', 2),
+                (1, 'a', 1),
+                (2, 'a', 1),
+                (2, 'b', 0),
+                (2, 'b', 1),
+            ],
+            {1},
+        )
+        self.assertFalse(
+            PebbleSimulationGames(automaton0, automaton1, 2).solve()[0]
         )
 
     def test_pebble_hierarchy_separates_k_from_k_plus_one(self):

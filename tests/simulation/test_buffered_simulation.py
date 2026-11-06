@@ -10,9 +10,9 @@ from bubbles import (
     SimulationGames,
 )
 from bubbles.games.simulation.BufferedSimulationGames import (
-    CHOICE,
     CONSUME,
     FLUSH,
+    INITIAL,
     Position,
 )
 
@@ -102,7 +102,7 @@ class BufferedSimulationScaffoldTest(unittest.TestCase):
         """Positions contain both states, buffer, direction, and phase."""
         position: Position = (0, "a", 1, 0, CONSUME)
         self.assertEqual(position, (0, "a", 1, 0, 1))
-        self.assertEqual((CHOICE, CONSUME, FLUSH), (0, 1, 2))
+        self.assertEqual((INITIAL, CONSUME, FLUSH), (0, 1, 2))
 
     def test_game_inherits_simulation_infrastructure(self):
         """Buffered simulation uses the shared simulation base class."""
@@ -211,6 +211,54 @@ class BufferedSimulationScaffoldTest(unittest.TestCase):
         equivalent, message = game.solve()
         self.assertFalse(equivalent)
         self.assertIn("not buffered simulation equivalent", message)
+
+    def test_nondeterministic_automata_are_buffered_simulation_equivalent(self):
+        """The game handles multiple transitions with the same symbol."""
+        FiniteAutomata.set_alphabet({'a', 'b', 'c'})
+        transitions = [
+            (0, 'a', 1),
+            (0, 'a', 2),
+            (1, 'b', 3),
+            (2, 'c', 3),
+            (3, 'a', 3),
+        ]
+        automaton0 = FiniteAutomata({0}, transitions, {3})
+        automaton1 = FiniteAutomata({0}, list(reversed(transitions)), {3})
+
+        for buffer_size in (1, 2):
+            with self.subTest(buffer_size=buffer_size):
+                equivalent, _ = BufferedSimulationGames(
+                    automaton0,
+                    automaton1,
+                    buffer_size=buffer_size,
+                ).solve()
+                self.assertTrue(equivalent)
+
+    def test_nondeterministic_active_choice_can_reveal_missing_response(self):
+        """A missing response is found on one nondeterministic active branch."""
+        FiniteAutomata.set_alphabet({'a', 'b', 'c'})
+        automaton0 = FiniteAutomata(
+            {0},
+            [
+                (0, 'a', 1),
+                (0, 'a', 2),
+                (1, 'b', 3),
+                (2, 'c', 3),
+            ],
+            {3},
+        )
+        automaton1 = FiniteAutomata(
+            {0},
+            [(0, 'a', 1), (1, 'b', 2)],
+            {2},
+        )
+
+        equivalent, _ = BufferedSimulationGames(
+            automaton0,
+            automaton1,
+            buffer_size=1,
+        ).solve()
+        self.assertFalse(equivalent)
 
     def test_buffered_solver_handles_multiple_buffer_sizes(self):
         """The predecessor rules work for both one and two buffered symbols."""
