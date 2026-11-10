@@ -149,10 +149,10 @@ class BufferedSimulationGames(BufferedGamesMixin, SimulationGames):
                                     ):
                                         return True
 
-                        if active_state not in self.finals[direction]:
-                            continue
-
-                        if not _acceptance_matches(state_pair, direction):
+                        if active_state in self.finals[direction] and not _acceptance_matches(
+                                state_pair,
+                                direction,
+                        ):
                             if _add_attractor_node(
                                     _make_position(
                                         state_pair,
@@ -184,8 +184,7 @@ class BufferedSimulationGames(BufferedGamesMixin, SimulationGames):
 
             Player I chooses an active transition from a non-full ``CONSUME``
             position. The resulting position may be a ``CONSUME`` or
-            ``FLUSH`` position, subject to the acceptance condition for
-            ``FLUSH``.
+            ``FLUSH`` position.
             """
             state0, buffer_word, state1, direction, phase = position
             state_pair = (state0, state1)
@@ -197,9 +196,6 @@ class BufferedSimulationGames(BufferedGamesMixin, SimulationGames):
                     return True
 
             if phase not in (CONSUME, FLUSH) or not buffer_word:
-                return False
-
-            if phase == FLUSH and state_pair[direction] not in self.finals[direction]:
                 return False
 
             last_letter = buffer_word[-1]

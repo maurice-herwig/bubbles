@@ -29,6 +29,7 @@ MANIFEST
 
 # Temporary files
 /tmp/
+benchmarks/tmp/game_runtime.csv
 
 # PyInstaller
 #  Usually these files are written by a python script from a template
@@ -145,3 +146,5 @@ cython_debug/
 /.vs
 
 /wofa
+
+/benchmarks/tmp
